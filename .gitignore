@@ -1,0 +1,11 @@
+.metadata/
+bin/
+*.class
+
+.project
+.classpath
+.settings/
+
+*.log
+*.tmp
+*.lock
