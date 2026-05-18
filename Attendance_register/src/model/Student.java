@@ -1,4 +1,5 @@
-package Info;
+package model;
+
 
 public class Student {
 	private String name;

@@ -1,4 +1,5 @@
-package Info;
+package model;
+
 
 import java.util.*;
 

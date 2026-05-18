@@ -1,4 +1,5 @@
-package Attendance_Info;
+package model;
+
 
 public enum AttendanceStatus {
     PRESENT("출석"),
