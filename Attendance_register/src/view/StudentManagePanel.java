@@ -1,5 +1,9 @@
 package view;
 
-public class StudentManagePanel {
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class StudentManagePanel extends JPanel {
 
 }

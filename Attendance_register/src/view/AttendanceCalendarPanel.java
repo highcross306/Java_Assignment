@@ -1,5 +1,9 @@
 package view;
 
-public class AttendanceCalendarPanel {
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class AttendanceCalendarPanel extends JPanel{
 
 }
