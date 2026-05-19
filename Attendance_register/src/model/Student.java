@@ -8,7 +8,7 @@ public class Student {
 	private int class_id;
 	private String student_phone;
 	
-	Student (String name, String school, int class_id){
+	public Student (String name, String school, int class_id){
 		setName(name);
 		setSchool(school);
 		setClass_Id(class_id);

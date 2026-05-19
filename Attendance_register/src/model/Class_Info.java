@@ -8,7 +8,7 @@ public class Class_Info {
 	private String class_name;
 	private Vector<Student> student_list;
 	
-	Class_Info(int class_id, String class_name){
+	public Class_Info(int class_id, String class_name){
 		setClass_Id(class_id);
 		setClass_Name(class_name);
 		student_list=new Vector<>();
