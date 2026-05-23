@@ -47,13 +47,13 @@ public class AttendanceRecord {
 	
 	//CSV에서 입력을 받아 객체 생성
 	public static AttendanceRecord fromCsv(String line) {
-		String[] parts = line.split(",", -1);//빈값도 포함한 상태로 분리
+		String[] parts = line.split(",", -1);//빈값도 포함해서 분리
 		//문장의 각 요소들을 추출하여 객체를 생성
-		int student_id = Integer.parseInt(parts[0].trim());
-		int class_id = Integer.parseInt(parts[1].trim());
-		LocalDate date = LocalDate.parse(parts[2].trim());
-		AttendanceStatus status = AttendanceStatus.valueOf(parts[3].trim());
-		String reason = parts[4].trim();
+		int student_id = Integer.parseInt(parts[0].trim()); //student_id
+		int class_id = Integer.parseInt(parts[1].trim()); //class_id
+		LocalDate date = LocalDate.parse(parts[2].trim()); //date
+		AttendanceStatus status = AttendanceStatus.valueOf(parts[3].trim()); //status
+		String reason = parts[4].trim(); //reason
 		return new AttendanceRecord(student_id, class_id, date, status, reason);
 	}
 }
