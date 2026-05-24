@@ -144,7 +144,7 @@ public class DataManager {
     
     //get 메소드
     public static ArrayList<Student> getStudent(){return students;}
-    public static ArrayList<Class_Info> getClassese(){return classes;}
+    public static ArrayList<Class_Info> getClasses(){return classes;}
     public static ArrayList<AttendanceRecord> getRecords(){return records;}
     //오늘의 날짜
     public static ArrayList<AttendanceRecord> getTodayRecords(){

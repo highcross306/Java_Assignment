@@ -1,0 +1,7 @@
+student_id,class_id,date,status,reason
+1,1,2026-05-24,PRESENT,
+2,1,2026-05-24,LATE,교통 지연
+3,2,2026-05-24,PRESENT,
+4,2,2026-05-24,ABSENT,병가
+5,3,2026-05-24,PRESENT,
+6,3,2026-05-24,EARLY_LEAVE,병원 방문
