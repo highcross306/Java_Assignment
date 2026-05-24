@@ -5,6 +5,9 @@ import java.awt.*;
 import java.awt.event.*;
 
 public class MainFrame extends JFrame{
+	//직렬화 아이디 선언(gui에서는 사용하지 않음)
+	private static final long serialVersionUID = 1L;
+	
 	private CardLayout cardLayout;
 	private JPanel contentPanel;
 	private JButton[] menuButtons; //메뉴 panel의 버튼 리스트
@@ -34,6 +37,14 @@ public class MainFrame extends JFrame{
 		add(buildContent(), BorderLayout.CENTER);
 		
 		switchCard(0);
+		
+		// 창 닫기 버튼 클릭 시 저장 후 종료
+		addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosing(WindowEvent e) {
+				System.exit(0); // ShutdownHook → saveAll() 자동 호출
+			}
+		});
 		
 		setLocationRelativeTo(null); //null->모니터 화면 정중앙에 배치
 		setVisible(true);
