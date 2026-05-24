@@ -1,9 +1,8 @@
 package model;
 
-import java.io.*; //csv 파일 읽기/쓰기
+import java.io.*; //csv파일 읽기/쓰기
 import java.time.*; //출석 기록의 날짜
 import java.util.*; //자료구조 불러오기
-import java.util.stream.*; // stream결과 편집
 
 public class DataManager {
 	private static final String STUDENTS_FILE = "data/students.csv";
@@ -71,7 +70,7 @@ public class DataManager {
 		students.clear();
 		File file = new File(STUDENTS_FILE);
 		if(!file.exists()) {
-			addDeafaultStudents();
+			addDefaultStudents();
 			return;
 		}
 		try(BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"))){
@@ -183,5 +182,73 @@ public class DataManager {
     		}
     	}
     	return null; //없다명 null 반환
+    }
+    
+    //출석 기록 추가/수정
+    public static void addRecord(AttendanceRecord record) {
+    	records.add(record);
+    }
+    public static void updateRecord(int student_id, LocalDate date, AttendanceStatus status, String reason) {
+    	for (AttendanceRecord r : records) {
+    		//해당 하는 학생이 있는 경우 업데이트
+    		if (r.getStudent_Id() == student_id && r.getDate().equals(date)) {
+    			r.setStatus(status);
+    			r.setReason(reason);
+    			return;
+    		}
+    	}
+    	
+    	//학생이 없으면 새로 추가
+    	Student s = findStudentById(student_id);
+    	if ( s!=null) {
+    		addRecord(new AttendanceRecord(student_id, s.getClass_Id(), date, status, reason));
+    	}
+    }
+    
+    //기본 데이터(csv 파일이 없으 때 만들 테스트용 데이터)
+    private static void addDefaultClasses() {
+        classes.add(new Class_Info(1, "1반"));
+        classes.add(new Class_Info(2, "2반"));
+        classes.add(new Class_Info(3, "3반"));
+        saveClasses();
+    }
+ 
+    private static void addDefaultStudents() {
+        students.add(new Student("김철수", "인하중학교", 1));
+        students.get(0).setStudent_Id(1);
+        students.get(0).setStudent_Phone("010-1234-5678");
+ 
+        students.add(new Student("이영희", "인하중학교", 1));
+        students.get(1).setStudent_Id(2);
+        students.get(1).setStudent_Phone("010-2345-6789");
+ 
+        students.add(new Student("박민수", "인하중학교", 2));
+        students.get(2).setStudent_Id(3);
+        students.get(2).setStudent_Phone("010-3456-7890");
+ 
+        students.add(new Student("정수진", "인하중학교", 2));
+        students.get(3).setStudent_Id(4);
+        students.get(3).setStudent_Phone("010-4567-8901");
+ 
+        students.add(new Student("최지훈", "인하중학교", 3));
+        students.get(4).setStudent_Id(5);
+        students.get(4).setStudent_Phone("010-5678-9012");
+ 
+        students.add(new Student("강서연", "인하중학교", 3));
+        students.get(5).setStudent_Id(6);
+        students.get(5).setStudent_Phone("010-6789-0123");
+ 
+        saveStudents();
+    }
+ 
+    private static void addDefaultAttendance() {
+        LocalDate today = LocalDate.now();
+        records.add(new AttendanceRecord(1, 1, today, AttendanceStatus.PRESENT,    ""));
+        records.add(new AttendanceRecord(2, 1, today, AttendanceStatus.LATE,       "교통 지연"));
+        records.add(new AttendanceRecord(3, 2, today, AttendanceStatus.PRESENT,    ""));
+        records.add(new AttendanceRecord(4, 2, today, AttendanceStatus.ABSENT,     "병가"));
+        records.add(new AttendanceRecord(5, 3, today, AttendanceStatus.PRESENT,    ""));
+        records.add(new AttendanceRecord(6, 3, today, AttendanceStatus.EARLY_LEAVE,"병원 방문"));
+        saveAttendance();
     }
 }
