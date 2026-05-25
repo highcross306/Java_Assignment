@@ -92,6 +92,7 @@ public class DataManager {
 				);
 				s.setStudent_Id(Integer.parseInt(parts[0].trim())); //student_id
 				s.setStudent_Phone(parts[4].trim()); //phone_num
+				s.setGuardian_Phone(parts[5].trim()); //guardian_phone
 				students.add(s);
 				studentMap.put(s.getStudent_id(), s);
 			}
@@ -103,11 +104,12 @@ public class DataManager {
 	private static void saveStudents() {
 		new File("data").mkdirs(); //파일이 없을 시 생성
 		try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(STUDENTS_FILE), "UTF-8"))){
-			pw.println("student_id,name,school,class_id,student_phone");
+			pw.println("student_id,name,school,class_id,student_phone,guardian_phone");
 			for (Student s : students) {
                 pw.println(s.getStudent_id() + "," + s.getName() + "," +
                            s.getSchool() + "," + s.getClass_Id() + "," +
-                           (s.getStudent_Phone() == null ? "" : s.getStudent_Phone()));
+                           (s.getStudent_Phone()  == null ? "" : s.getStudent_Phone()) + "," +
+                           (s.getGuardian_Phone() == null ? "" : s.getGuardian_Phone()));
 			}
 		}catch (IOException e) {
 			System.err.println("학생 데이터 저장 실패: " + e.getMessage());
@@ -217,26 +219,32 @@ public class DataManager {
         students.add(new Student("김철수", "인하중학교", 1));
         students.get(0).setStudent_Id(1);
         students.get(0).setStudent_Phone("010-1234-5678");
+        students.get(0).setGuardian_Phone("010-1111-2222");
  
         students.add(new Student("이영희", "인하중학교", 1));
         students.get(1).setStudent_Id(2);
         students.get(1).setStudent_Phone("010-2345-6789");
+        students.get(1).setGuardian_Phone("010-2222-3333");
  
         students.add(new Student("박민수", "인하중학교", 2));
         students.get(2).setStudent_Id(3);
         students.get(2).setStudent_Phone("010-3456-7890");
+        students.get(2).setGuardian_Phone("010-3333-4444");
  
         students.add(new Student("정수진", "인하중학교", 2));
         students.get(3).setStudent_Id(4);
         students.get(3).setStudent_Phone("010-4567-8901");
+        students.get(3).setGuardian_Phone("010-4444-5555");
  
         students.add(new Student("최지훈", "인하중학교", 3));
         students.get(4).setStudent_Id(5);
         students.get(4).setStudent_Phone("010-5678-9012");
+        students.get(4).setGuardian_Phone("010-5555-6666");
  
         students.add(new Student("강서연", "인하중학교", 3));
         students.get(5).setStudent_Id(6);
         students.get(5).setStudent_Phone("010-6789-0123");
+        students.get(5).setGuardian_Phone("010-6666-7777");
         
         //HashMap에도 저장
         for (Student s : students) {

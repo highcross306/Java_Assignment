@@ -7,6 +7,7 @@ public class Student {
 	private int student_id;
 	private int class_id;
 	private String student_phone;
+	private String guardian_phone;
 	
 	public Student (String name, String school, int class_id){
 		setName(name);
@@ -47,5 +48,12 @@ public class Student {
 	}
 	public String getStudent_Phone() {
 		return student_phone;
+	}
+	
+	public void setGuardian_Phone(String guardian_phone) {
+	    this.guardian_phone = guardian_phone;
+	}
+	public String getGuardian_Phone() {
+	    return guardian_phone;
 	}
 }
