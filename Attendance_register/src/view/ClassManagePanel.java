@@ -458,7 +458,7 @@ public class ClassManagePanel extends JPanel{
 	    return statsPanel;
 	}
 	
-	//통계 가트 생성
+	//통계 카드 생성
 	private JPanel buildStatCard(String label, JLabel valueLabel, Color iconBg) {
 	    JPanel card = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 14));
 	    card.setBackground(Color.WHITE);

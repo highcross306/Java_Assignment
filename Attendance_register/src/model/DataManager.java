@@ -13,6 +13,9 @@ public class DataManager {
 	private static ArrayList<Class_Info> classes = new ArrayList<>();
 	private static ArrayList<AttendanceRecord> records = new ArrayList<>();
 	
+	//Hashmap으로 빠른 검색
+	private static HashMap<Integer, Student>   studentMap = new HashMap<>();
+	private static HashMap<Integer, Class_Info> classMap  = new HashMap<>();
 	//프로그램 시작 시 호출, 전체 로드
 	public static void loadAll() {
 		loadClasses();
@@ -29,6 +32,7 @@ public class DataManager {
 	//반 호출/저장
 	private static void loadClasses() {
 		classes.clear();
+		classMap.clear();
 		File file = new File(CLASSES_FILE); //파일 불러오기
 		if(!file.exists()) {
 			addDefaultClasses(); //파일 없으면 기본 데이터 생성
@@ -46,6 +50,7 @@ public class DataManager {
 						parts[1].trim() //class_name
 				);
 				classes.add(cls);
+				classMap.put(cls.getClass_Id(), cls);
 			}
 		}catch(IOException e) {
 			System.err.println("반 데이터 로드 실패: " + e.getMessage());
@@ -56,7 +61,7 @@ public class DataManager {
 		new File("data").mkdirs();
 		try(PrintWriter pw = new PrintWriter(
 				new OutputStreamWriter(new FileOutputStream(CLASSES_FILE), "UTF-8"))){
-			pw.println("class_id, class_name");//헤더 작성
+			pw.println("class_id,class_name");//헤더 작성
 			for(Class_Info cls : classes) {
 				pw.println(cls.getClass_Id() + "," + cls.getClass_Name());
 			}
@@ -68,6 +73,7 @@ public class DataManager {
 	//학생 호출/저장
 	private static void loadStudents() {
 		students.clear();
+		studentMap.clear();
 		File file = new File(STUDENTS_FILE);
 		if(!file.exists()) {
 			addDefaultStudents();
@@ -87,6 +93,7 @@ public class DataManager {
 				s.setStudent_Id(Integer.parseInt(parts[0].trim())); //student_id
 				s.setStudent_Phone(parts[4].trim()); //phone_num
 				students.add(s);
+				studentMap.put(s.getStudent_id(), s);
 			}
 		}catch(IOException e) {
 			System.err.println("학생 데이터 로드 실패: " + e.getMessage());
@@ -96,7 +103,7 @@ public class DataManager {
 	private static void saveStudents() {
 		new File("data").mkdirs(); //파일이 없을 시 생성
 		try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(STUDENTS_FILE), "UTF-8"))){
-			pw.println("student_id, name, school, class_id, student_phone");
+			pw.println("student_id,name,school,class_id,student_phone");
 			for (Student s : students) {
                 pw.println(s.getStudent_id() + "," + s.getName() + "," +
                            s.getSchool() + "," + s.getClass_Id() + "," +
@@ -167,21 +174,11 @@ public class DataManager {
     }
     //student_id로 학생 조회
     public static Student findStudentById(int id) {
-    	for (Student s: students) {
-    		if(s.getStudent_id() == id) {
-    			return s;
-    		}
-    	}
-    	return null; //없다명 null 반환
+    	return studentMap.get(id);
     }
     //class_id로 반 조회
     public static Class_Info findClassById(int id) {
-    	for(Class_Info c : classes) {
-    		if(c.getClass_Id() == id){
-    			return c;
-    		}
-    	}
-    	return null; //없다명 null 반환
+    	return classMap.get(id); //없다명 null 반환
     }
     
     //출석 기록 추가/수정
@@ -205,11 +202,14 @@ public class DataManager {
     	}
     }
     
-    //기본 데이터(csv 파일이 없으 때 만들 테스트용 데이터)
+    //기본 데이터(csv 파일이 없을 때 만들 테스트용 데이터)
     private static void addDefaultClasses() {
-        classes.add(new Class_Info(1, "1반"));
-        classes.add(new Class_Info(2, "2반"));
-        classes.add(new Class_Info(3, "3반"));
+        Class_Info c1 = new Class_Info(1, "1반");
+        Class_Info c2 = new Class_Info(2, "2반");
+        Class_Info c3 = new Class_Info(3, "3반");
+        classes.add(c1); classMap.put(1, c1); //ArrayList와 HashMap 둘 다 저장
+        classes.add(c2); classMap.put(2, c2);
+        classes.add(c3); classMap.put(3, c3);
         saveClasses();
     }
  
@@ -237,17 +237,21 @@ public class DataManager {
         students.add(new Student("강서연", "인하중학교", 3));
         students.get(5).setStudent_Id(6);
         students.get(5).setStudent_Phone("010-6789-0123");
- 
+        
+        //HashMap에도 저장
+        for (Student s : students) {
+        	studentMap.put(s.getStudent_id(), s);
+        }
         saveStudents();
     }
  
     private static void addDefaultAttendance() {
         LocalDate today = LocalDate.now();
-        records.add(new AttendanceRecord(1, 1, today, AttendanceStatus.PRESENT,    ""));
-        records.add(new AttendanceRecord(2, 1, today, AttendanceStatus.LATE,       "교통 지연"));
-        records.add(new AttendanceRecord(3, 2, today, AttendanceStatus.PRESENT,    ""));
-        records.add(new AttendanceRecord(4, 2, today, AttendanceStatus.ABSENT,     "병가"));
-        records.add(new AttendanceRecord(5, 3, today, AttendanceStatus.PRESENT,    ""));
+        records.add(new AttendanceRecord(1, 1, today, AttendanceStatus.PRESENT, ""));
+        records.add(new AttendanceRecord(2, 1, today, AttendanceStatus.LATE, "교통 지연"));
+        records.add(new AttendanceRecord(3, 2, today, AttendanceStatus.PRESENT, ""));
+        records.add(new AttendanceRecord(4, 2, today, AttendanceStatus.ABSENT, "병가"));
+        records.add(new AttendanceRecord(5, 3, today, AttendanceStatus.PRESENT, ""));
         records.add(new AttendanceRecord(6, 3, today, AttendanceStatus.EARLY_LEAVE,"병원 방문"));
         saveAttendance();
     }
