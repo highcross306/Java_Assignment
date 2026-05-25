@@ -7,6 +7,9 @@ import java.awt.event.*;
 import model.*;
 
 public class ClassManagePanel extends JPanel{
+	//직렬화 아이디 선언(gui에서는 사용하지 않음)
+	private static final long serialVersionUID = 1L;
+		
 	private static final Color BTN_NORMAL = new Color(37,  99,  235); // 기본 파란색
 	private static final Color BTN_HOVER  = new Color(29,  78,  216); // hover 시 진한 파란색
 	private static final Color BTN_PRESS  = new Color(30,  64,  175); // 클릭 시 더 진한 파란색
@@ -14,6 +17,10 @@ public class ClassManagePanel extends JPanel{
 	private JTable table;       // 필드로 선언 (repaint 호출에 필요)
 	private int hoverRow = -1;  // 마우스가 올라간 행
 	private int hoverBtn = -1;  // 0 = 수정, 1 = 삭제, -1 = 없음 (마우스 상태 확인용 필드)
+	
+	//통계 자료 레이블
+	private JLabel classCountLabel; //전체 반 수
+	private JLabel studentCountLabel; //전체 학생 수
 	
 	public ClassManagePanel() {
 		//전체 영역 설정
@@ -23,6 +30,7 @@ public class ClassManagePanel extends JPanel{
 		
 		add(buildTitleBar(), BorderLayout.NORTH); //상단-타이틀
 		add(buildTable(),    BorderLayout.CENTER); //중단-표
+		add(buildStats(),    BorderLayout.SOUTH); //하단-통계 자료
 	}
 	
 	private JPanel buildTitleBar() {
@@ -231,17 +239,251 @@ public class ClassManagePanel extends JPanel{
 					"" //관리 버튼은 다음 단계에 추가
 			});
 		}
+		
+		// 통계 카드 갱신
+	    if (classCountLabel != null) {
+	        classCountLabel.setText(String.valueOf(DataManager.getClasses().size()));
+	        studentCountLabel.setText(String.valueOf(DataManager.getStudent().size()));
+	    }
 	}
 	
 	private void showAddDialog() {
+		//dialog 생성, 부모 창을 반환해서, 부모 창과 연동을 한다. true이므로 부모 창 클릭 불가
+		JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "반 추가", true);
+		dialog.setSize(280, 180);
+		dialog.setLocationRelativeTo(this);
+		dialog.setLayout(new BorderLayout());
 		
+		//입력 영역
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setBackground(Color.WHITE);
+		body.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
+		
+		//반 이름 레이블
+		JLabel nameLabel = new JLabel("반 이름");
+		nameLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+		nameLabel.setForeground(new Color(107, 114, 128));
+		
+		//반 이름 입력 상자
+		JTextField nameField = new JTextField();
+		nameField.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		nameField.setBorder(BorderFactory.createCompoundBorder(
+				BorderFactory.createLineBorder(new Color(209, 213, 219), 1), 
+				BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+		
+		body.add(nameLabel);
+		body.add(Box.createRigidArea(new Dimension(0, 4)));
+		body.add(nameField);
+		
+		//버튼 영역
+		JPanel btnBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 12));
+		btnBar.setBackground(Color.WHITE);
+		btnBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(243, 244, 246)));
+		
+		//취소 버튼
+		JButton cancelBtn = new JButton("취소");
+		cancelBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		cancelBtn.setFocusPainted(false);
+		cancelBtn.addActionListener(e->dialog.dispose()); //누르면 창 닫기
+		
+		//저장 버튼
+		JButton saveBtn = new JButton("저장");
+	    saveBtn.setFont(new Font("맑은 고딕", Font.BOLD, 12));
+	    saveBtn.setBackground(new Color(37, 99, 235));
+	    saveBtn.setForeground(Color.WHITE);
+	    saveBtn.setOpaque(true);
+	    saveBtn.setBorderPainted(false);
+	    saveBtn.setFocusPainted(false);
+	    saveBtn.addActionListener(e -> {
+	        String name = nameField.getText().trim(); //JTextField에 입력 된 문자려, 공백을 잘라서 반환
+
+	        // 빈 값 검사
+	        if (name.isEmpty()) {
+	            JOptionPane.showMessageDialog(dialog,
+	                "반 이름을 입력하세요.", "입력 오류",
+	                JOptionPane.WARNING_MESSAGE);
+	            return;
+	        }
+
+	        // 새 반 ID = 현재 반 수 + 1
+	        int newId = DataManager.getClasses().size() + 1;
+	        DataManager.getClasses().add(new Class_Info(newId, name));
+	        refreshTable();   // 테이블 갱신
+	        dialog.dispose();
+	    });
+
+	    btnBar.add(cancelBtn);
+	    btnBar.add(saveBtn);
+
+	    dialog.add(body,   BorderLayout.CENTER);
+	    dialog.add(btnBar, BorderLayout.SOUTH);
+	    dialog.setVisible(true);
 	}
 	
 	private void showEditDialog(int row) {
-		
+	    // 선택한 행에서 현재 데이터 가져오기
+	    int classId   = (int) tableModel.getValueAt(row, 0);
+	    String curName = (String) tableModel.getValueAt(row, 1);
+	    
+	    //반 정보 수정 창
+	    JDialog dialog = new JDialog(
+	        (Frame) SwingUtilities.getWindowAncestor(this), "반 수정", true);
+	    dialog.setSize(280, 180);
+	    dialog.setLocationRelativeTo(this);
+	    dialog.setLayout(new BorderLayout());
+
+	    // 입력 영역
+	    JPanel body = new JPanel();
+	    body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+	    body.setBackground(Color.WHITE);
+	    body.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
+	    
+	    //반 이름 레이블
+	    JLabel nameLabel = new JLabel("반 이름");
+	    nameLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+	    nameLabel.setForeground(new Color(107, 114, 128));
+	    
+	    //반 이름 입력 상자
+	    JTextField nameField = new JTextField(curName); // 현재 이름 미리 입력
+	    nameField.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+	    nameField.setBorder(BorderFactory.createCompoundBorder(
+	        BorderFactory.createLineBorder(new Color(209, 213, 219), 1),
+	        BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+
+	    body.add(nameLabel);
+	    body.add(Box.createRigidArea(new Dimension(0, 4)));
+	    body.add(nameField);
+
+	    // 버튼 영역
+	    JPanel btnBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 12));
+	    btnBar.setBackground(Color.WHITE);
+	    btnBar.setBorder(BorderFactory.createMatteBorder(
+	        1, 0, 0, 0, new Color(243, 244, 246)));
+	    
+	    //취소 버튼
+	    JButton cancelBtn = new JButton("취소");
+	    cancelBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+	    cancelBtn.setFocusPainted(false);
+	    cancelBtn.addActionListener(e -> dialog.dispose());
+	    
+	    //저장 버튼
+	    JButton saveBtn = new JButton("저장");
+	    saveBtn.setFont(new Font("맑은 고딕", Font.BOLD, 12));
+	    saveBtn.setBackground(new Color(37, 99, 235));
+	    saveBtn.setForeground(Color.WHITE);
+	    saveBtn.setOpaque(true); //배경색 보이게 하기
+	    saveBtn.setBorderPainted(false);
+	    saveBtn.setFocusPainted(false);
+	    saveBtn.addActionListener(e -> {
+	        String name = nameField.getText().trim(); //JTextField에 입력 된 문자려, 공백을 잘라서 반환
+
+	        // 빈 값 검사
+	        if (name.isEmpty()) {
+	            JOptionPane.showMessageDialog(dialog,
+	                "반 이름을 입력하세요.", "입력 오류",
+	                JOptionPane.WARNING_MESSAGE);
+	            return;
+	        }
+
+	        // DataManager 에서 해당 반 찾아서 이름 수정
+	        Class_Info cls = DataManager.findClassById(classId);
+	        if (cls != null) {
+	            cls.setClass_Name(name);
+	        }
+	        refreshTable();   // 테이블 갱신
+	        dialog.dispose();
+	    });
+
+	    btnBar.add(cancelBtn);
+	    btnBar.add(saveBtn);
+
+	    dialog.add(body,   BorderLayout.CENTER);
+	    dialog.add(btnBar, BorderLayout.SOUTH);
+	    dialog.setVisible(true);
 	}
 	
 	private void showDeleteDialog(int row) {
-		
+	    // 선택한 행에서 현재 데이터 가져오기
+	    int classId    = (int) tableModel.getValueAt(row, 0);
+	    String className = (String) tableModel.getValueAt(row, 1);
+
+	    // 확인 다이얼로그, [예], [아니요] 버튼 구성
+	    int result = JOptionPane.showConfirmDialog(
+	        this,
+	        "'" + className + "' 반을 삭제하시겠습니까?\n" +
+	        "해당 반의 학생 데이터도 함께 삭제됩니다.",
+	        "반 삭제",
+	        JOptionPane.YES_NO_OPTION, //[예](0 반환), [아니요](1 반환)
+	        JOptionPane.WARNING_MESSAGE
+	    );
+
+	    if (result == JOptionPane.YES_OPTION) {
+	        // 해당 반 학생 먼저 삭제
+	        DataManager.getStudent().removeIf(
+	            s -> s.getClass_Id() == classId
+	        );
+
+	        // 반 삭제
+	        DataManager.getClasses().removeIf(
+	            cls -> cls.getClass_Id() == classId
+	        );
+
+	        refreshTable(); // 테이블 갱신
+	    }
+	}
+	
+	//통계 자료 추출하기
+	private JPanel buildStats() {
+	    JPanel statsPanel = new JPanel(new GridLayout(1, 2, 14, 0));
+	    statsPanel.setBackground(new Color(248, 249, 251));
+	    statsPanel.setBorder(BorderFactory.createEmptyBorder(14, 0, 0, 0));
+
+	    // 레이블을 필드에 통계 값 저장
+	    classCountLabel   = new JLabel(String.valueOf(DataManager.getClasses().size()));
+	    studentCountLabel = new JLabel(String.valueOf(DataManager.getStudent().size()));
+
+	    classCountLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
+	    classCountLabel.setForeground(new Color(29, 78, 216));
+
+	    studentCountLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
+	    studentCountLabel.setForeground(new Color(21, 128, 61));
+	    
+	    //통계 카드로 값 전달
+	    statsPanel.add(buildStatCard("전체 반 수",   classCountLabel,
+	        new Color(239, 246, 255)));
+	    statsPanel.add(buildStatCard("전체 학생 수", studentCountLabel,
+	        new Color(240, 253, 244)));
+
+	    return statsPanel;
+	}
+	
+	//통계 가트 생성
+	private JPanel buildStatCard(String label, JLabel valueLabel, Color iconBg) {
+	    JPanel card = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 14));
+	    card.setBackground(Color.WHITE);
+	    card.setBorder(BorderFactory.createLineBorder(new Color(243, 244, 246), 1));
+	    
+	    //색상 박스
+	    JPanel iconBox = new JPanel();
+	    iconBox.setBackground(iconBg);
+	    iconBox.setPreferredSize(new Dimension(38, 38));
+	    
+	    //제이블과 숫자를 세로로 쌓는 패널
+	    JPanel info = new JPanel();
+	    info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
+	    info.setBackground(Color.WHITE);
+
+	    //카드 위의 설명 텍스트
+	    JLabel labelComp = new JLabel(label);
+	    labelComp.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+	    labelComp.setForeground(new Color(107, 114, 128));
+
+	    info.add(labelComp);
+	    info.add(valueLabel);  // 필드 레이블 직접 추가
+
+	    card.add(iconBox);
+	    card.add(info);
+	    return card;
 	}
 }
