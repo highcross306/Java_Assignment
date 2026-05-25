@@ -83,7 +83,7 @@ public class ClassManagePanel extends JPanel{
 	}
 	
 	private JPanel buildTable() {
-		//table 생성(반 ID, 반 이름, 학생 수, 관리)
+		//table 생성(반 ID, 반 이름, 학생 수, 관리), 초기행수
 		tableModel = new DefaultTableModel(
 			new String[] {"반 ID", "반 이름", "학생 수", "관리"}, 0) {
 			@Override
