@@ -166,6 +166,16 @@ public class DataManager {
     	}
     	return result;  //오늘의 출석 기록 반환
     }
+    
+    //다음 학생의 id 검색
+    public static int getNextStudentId() {
+        int max = 0;
+        for (Student s : students) {
+            if (s.getStudent_id() > max) max = s.getStudent_id();
+        }
+        return max + 1;
+    }
+    
     //오늘 status 상태의 학생 수
     public static int countTodayByStatus(AttendanceStatus status) {
     	int count = 0;

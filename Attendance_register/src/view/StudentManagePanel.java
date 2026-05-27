@@ -30,7 +30,7 @@ public class StudentManagePanel extends JPanel {
 	
 	//다이얼로그 크기 필드
 	private final int Dialog_weight = 400;
-	private final int Dialog_height = 450;
+	private final int Dialog_height = 500;
 	
 	public StudentManagePanel() {
 		setLayout(new BorderLayout());
@@ -246,7 +246,12 @@ public class StudentManagePanel extends JPanel {
 	    dialog.setSize(Dialog_weight, Dialog_height);
 	    dialog.setLocationRelativeTo(this);
 	    dialog.setLayout(new BorderLayout());
-	    dialog.add(buildFormPanel(null), BorderLayout.CENTER);
+	    
+	    //폼 만들기
+	    JPanel form = buildFormPanel(null);
+	    dialog.add(form, BorderLayout.CENTER);
+	    //저장 버튼 생성
+	    dialog.add(buildBtnBar(dialog, form, null), BorderLayout.SOUTH);
 	    dialog.setVisible(true);
 	}
 	
@@ -259,7 +264,12 @@ public class StudentManagePanel extends JPanel {
 	    dialog.setSize(Dialog_weight, Dialog_height);
 	    dialog.setLocationRelativeTo(this);
 	    dialog.setLayout(new BorderLayout());
-	    dialog.add(buildFormPanel(target), BorderLayout.CENTER);
+	    
+	    //폼 만들기
+	    JPanel form = buildFormPanel(target);
+	    dialog.add(form, BorderLayout.CENTER);
+	    //저장 버튼 생성
+	    dialog.add(buildBtnBar(dialog, form, target), BorderLayout.SOUTH);
 	    dialog.setVisible(true);
 	}
 	
@@ -297,12 +307,20 @@ public class StudentManagePanel extends JPanel {
 	    JComboBox<String> classCombo = new JComboBox<>(); //반(콤보 박스의 형태로 입력)
 	    classCombo.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
 	    classCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+	    classCombo.addItem("-- 반 선택 --");
 	    for (Class_Info cls : DataManager.getClasses()) {
 	        classCombo.addItem(cls.getClass_Name());
 	        if (student != null && cls.getClass_Id() == student.getClass_Id()) {
 	            classCombo.setSelectedItem(cls.getClass_Name());
 	        }
 	    }
+	    
+	    // 폼에서 필드를 꺼내 쓸 수 있도록 putClientProperty 추가
+	    body.putClientProperty("nameField", nameField);
+	    body.putClientProperty("schoolField", schoolField);
+	    body.putClientProperty("classCombo", classCombo);
+	    body.putClientProperty("phoneField", phoneField);
+	    body.putClientProperty("guardianField", guardianField);
 	    
 	    //텍스트, 텍트스 필드를 입력해서 각각의 항목들을 생성
 	    body.add(makeFieldGroup("이름", nameField));
@@ -361,5 +379,97 @@ public class StudentManagePanel extends JPanel {
 	    group.add(field); //텍스트 필드 항목에 추가
 	    // 항목 반환
 	    return group;
+	}
+	
+	private JPanel buildBtnBar(JDialog dialog, JPanel form, Student existing) {
+		//아래 바 패널 생성
+	    JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+	    bar.setBackground(WHITE);
+	    bar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(229, 231, 235)));
+	    
+	    //취소 버튼 생성
+	    JButton cancelBtn = new JButton("취소");
+	    cancelBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+	    cancelBtn.setFocusPainted(false);
+	    cancelBtn.addActionListener(e -> dialog.dispose()); //창 닫기
+	    
+	    //저장 버튼 생성
+	    JButton saveBtn = new JButton("저장");
+	    saveBtn.setFont(new Font("맑은 고딕", Font.BOLD, 12));
+	    saveBtn.setBackground(BLUE);
+	    saveBtn.setForeground(WHITE);
+	    saveBtn.setOpaque(true);
+	    saveBtn.setContentAreaFilled(false); //L&F 끄기
+	    saveBtn.setOpaque(true);
+	    saveBtn.setBorderPainted(false);
+	    saveBtn.setFocusPainted(false);
+	    saveBtn.setBorder(BorderFactory.createEmptyBorder(7, 14, 7, 14));
+	    
+	    //저장 버튼 리스너
+	    saveBtn.addActionListener(e -> {
+	        // 폼에서 필드 꺼내기
+	        JTextField   nameField     = (JTextField)  form.getClientProperty("nameField");
+	        JTextField   schoolField   = (JTextField)  form.getClientProperty("schoolField");
+	        JComboBox<?> classCombo    = (JComboBox<?>) form.getClientProperty("classCombo");
+	        JTextField   phoneField    = (JTextField)  form.getClientProperty("phoneField");
+	        JTextField   guardianField = (JTextField)  form.getClientProperty("guardianField");
+
+	        String name     = nameField.getText().trim(); //이름
+	        String school   = schoolField.getText().trim();  //학교
+	        String phone    = phoneField.getText().trim(); //전화번호
+	        String guardian = guardianField.getText().trim(); //보호자 전화번호
+	        int    selIdx   = classCombo.getSelectedIndex(); //반 선택 idx(콤보박스)
+	        
+	        //입력 오류 시 반복을 위한 필드
+	        boolean saved = false;
+	        // 기존 필수 입력 검사
+	        while(!saved) {
+		        try {
+		        	if (name.isEmpty()) throw new Exception("이름을 입력하세요."); //이름 필수 입력 예외 처리
+		        	if (school.isEmpty()) throw new Exception("학교를 입력하세요."); //학교 필수 입력 예외 처리
+		        	if (selIdx == 0) throw new Exception("반을 선택하세요."); // 반 필수 선택 예외 처리
+		        	
+		            int classId = DataManager.getClasses().get(selIdx - 1).getClass_Id();
+	
+		            if (existing == null) {
+		                // 추가 모드
+		                Student s = new Student(name, school, classId);
+		                s.setStudent_Id(DataManager.getNextStudentId());
+		                s.setStudent_Phone(phone);
+		                s.setGuardian_Phone(guardian);
+		                DataManager.getStudent().add(s);
+		            } else {
+		                // 수정 모드
+		                existing.setName(name);
+		                existing.setSchool(school);
+		                existing.setClass_Id(classId);
+		                existing.setStudent_Phone(phone);
+		                existing.setGuardian_Phone(guardian);
+		            }
+	
+		            refreshTable();
+		            dialog.dispose();
+		            saved = true; //저장 성공 시에 반복을 종료
+	
+		        } catch (Exception ex) {
+		            JOptionPane.showMessageDialog(dialog,
+		                ex.getMessage(), "입력 오류", JOptionPane.WARNING_MESSAGE);
+		            return; //경고창을 닫으면 재입력 대기
+		        }
+	        }
+	    });
+	    
+	    //저장 버튼 색상 변경
+	    saveBtn.addMouseListener(new MouseAdapter() {
+	        @Override public void mouseEntered(MouseEvent e)  { saveBtn.setBackground(BTN_HOVER); }
+	        @Override public void mouseExited(MouseEvent e)   { saveBtn.setBackground(BLUE);      }
+	        @Override public void mousePressed(MouseEvent e)  { saveBtn.setBackground(BTN_PRESS); }
+	        @Override public void mouseReleased(MouseEvent e) { saveBtn.setBackground(BTN_HOVER); }
+	    });
+	    
+	    //취소와 저장 버튼 생성 후, 바를 반환
+	    bar.add(cancelBtn);
+	    bar.add(saveBtn);
+	    return bar;
 	}
 }
