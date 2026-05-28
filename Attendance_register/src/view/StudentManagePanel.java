@@ -434,7 +434,7 @@ public class StudentManagePanel extends JPanel {
 		            if (existing == null) {
 		                // 추가 모드
 		                Student s = new Student(name, school, classId);
-		                s.setStudent_Id(DataManager.getNextStudentId());
+		                s.setStudent_Id(DataManager.getNextStudentId()); //새로 추가할 학생의 id를 자동으로 받는다.
 		                s.setStudent_Phone(phone);
 		                s.setGuardian_Phone(guardian);
 		                DataManager.getStudent().add(s);

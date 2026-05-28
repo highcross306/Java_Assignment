@@ -5,3 +5,5 @@ student_id,class_id,date,status,reason
 4,2,2026-05-25,ABSENT,병가
 5,3,2026-05-25,PRESENT,
 6,3,2026-05-25,EARLY_LEAVE,병원 방문
+1,1,2026-05-28,ABSENT,fesfsfsf
+2,1,2026-05-28,PRESENT,
