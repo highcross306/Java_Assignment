@@ -12,7 +12,6 @@ public class DashboardPanel extends JPanel {
     // 색상 상수
     private static final Color BG       = new Color(248, 249, 251);
     private static final Color WHITE    = Color.WHITE;
-    private static final Color BLUE     = new Color(37,  99,  235);
     private static final Color GRAY_TXT = new Color(107, 114, 128);
     private static final Color BORDER   = new Color(229, 231, 235);
     

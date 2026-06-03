@@ -247,6 +247,7 @@ public class ClassManagePanel extends JPanel{
 	    }
 	}
 	
+	//추가 다이어로그
 	private void showAddDialog() {
 		//dialog 생성, 부모 창을 반환해서, 부모 창과 연동을 한다. true이므로 부모 창 클릭 불가
 		JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "반 추가", true);
@@ -309,6 +310,7 @@ public class ClassManagePanel extends JPanel{
 	        // 새 반 ID = 현재 반 수 + 1
 	        int newId = DataManager.getClasses().size() + 1;
 	        DataManager.getClasses().add(new Class_Info(newId, name));
+	        DataManager.saveAll(); // 즉시 저장
 	        refreshTable();   // 테이블 갱신
 	        dialog.dispose();
 	    });
@@ -391,6 +393,7 @@ public class ClassManagePanel extends JPanel{
 	        if (cls != null) {
 	            cls.setClass_Name(name);
 	        }
+	        DataManager.saveAll(); // 즉시 저장
 	        refreshTable();   // 테이블 갱신
 	        dialog.dispose();
 	    });
@@ -428,7 +431,7 @@ public class ClassManagePanel extends JPanel{
 	        DataManager.getClasses().removeIf(
 	            cls -> cls.getClass_Id() == classId
 	        );
-
+	        DataManager.saveAll(); // 즉시 저장
 	        refreshTable(); // 테이블 갱신
 	    }
 	}

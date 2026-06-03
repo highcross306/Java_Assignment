@@ -286,6 +286,7 @@ public class StudentManagePanel extends JPanel {
 	    if (result == JOptionPane.YES_OPTION) { //학생 정보 지우기
 	        DataManager.getStudent().removeIf(
 	            s -> s.getStudent_id() == target.getStudent_id());
+	        DataManager.saveAll(); // 즉시 저장
 	        refreshTable();
 	    }
 	}
@@ -438,6 +439,7 @@ public class StudentManagePanel extends JPanel {
 		                s.setStudent_Phone(phone);
 		                s.setGuardian_Phone(guardian);
 		                DataManager.getStudent().add(s);
+		                DataManager.saveAll(); // 즉시 저장
 		            } else {
 		                // 수정 모드
 		                existing.setName(name);
@@ -445,8 +447,8 @@ public class StudentManagePanel extends JPanel {
 		                existing.setClass_Id(classId);
 		                existing.setStudent_Phone(phone);
 		                existing.setGuardian_Phone(guardian);
+		                DataManager.saveAll(); // 즉시 저장
 		            }
-	
 		            refreshTable();
 		            dialog.dispose();
 		            saved = true; //저장 성공 시에 반복을 종료
