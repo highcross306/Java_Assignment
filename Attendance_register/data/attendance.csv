@@ -7,3 +7,7 @@ student_id,class_id,date,status,reason
 6,3,2026-05-25,EARLY_LEAVE,병원 방문
 1,1,2026-05-28,ABSENT,fesfsfsf
 2,1,2026-05-28,PRESENT,
+1,1,2025-05-30,ABSENT,fdsfs
+2,1,2025-05-30,PRESENT,
+1,1,2026-06-01,PRESENT,
+2,1,2026-06-01,PRESENT,
