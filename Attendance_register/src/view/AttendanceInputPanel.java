@@ -279,20 +279,38 @@ public class AttendanceInputPanel extends JPanel {
         JButton resetBtn = new JButton("초기화");
         resetBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
         resetBtn.setFocusPainted(false);
-        resetBtn.addActionListener(e -> { //초기화 전, 경고 창 띄우기
+        resetBtn.addActionListener(e -> {
             int result = JOptionPane.showConfirmDialog(
                 this,
-                "입력 내용을 초기화하시겠습니까?",
+                "입력 내용을 초기화하시겠습니까?\n저장된 출석 기록도 삭제됩니다.",
                 "초기화",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
             );
             if (result == JOptionPane.YES_OPTION) {
+                // 선택된 날짜 가져오기
+                Date selected = (Date) dateSpinner.getValue();
+                LocalDate date = selected.toInstant()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate();
+
+                // 선택된 반 가져오기
+                int selIdx = classCombo.getSelectedIndex();
+                Class_Info selectedClass = DataManager.getClasses().get(selIdx);
+
+                // 해당 날짜 + 해당 반의 출석 기록 삭제
+                DataManager.getRecords().removeIf(r ->
+                    r.getDate().equals(date) &&
+                    r.getClass_Id() == selectedClass.getClass_Id()
+                );
+
+                // 임시 저장 맵 초기화
                 statusMap.clear();
                 reasonMap.clear();
+
                 refreshTable();
             }
-        });
+        });;
 
         // 저장 버튼
         JButton saveBtn = new JButton("저장");
