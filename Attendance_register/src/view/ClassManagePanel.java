@@ -486,4 +486,9 @@ public class ClassManagePanel extends JPanel{
 	    card.add(info);
 	    return card;
 	}
+	
+	//메인에서 쓸 refresh 메소드
+    public void refresh() {
+        refreshTable();
+    }
 }

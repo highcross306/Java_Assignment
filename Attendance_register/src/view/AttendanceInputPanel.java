@@ -354,4 +354,13 @@ public class AttendanceInputPanel extends JPanel {
             selectedClass.getClass_Name() + " 출석이 저장되었습니다.",
             "저장 완료", JOptionPane.INFORMATION_MESSAGE);
     }
+    
+    //메인에서 쓸 refresh 메소드
+    public void refresh() {
+        classCombo.removeAllItems(); //반 다시 불러오기
+        for (Class_Info cls : DataManager.getClasses()) {
+            classCombo.addItem(cls.getClass_Name());
+        }
+        refreshTable(); //테이블 초기화
+    }
 }

@@ -265,4 +265,10 @@ public class DashboardPanel extends JPanel {
             });
         }
     }
+    
+    //메인에서 쓸 refresh 메소드
+    public void refresh() {
+        refreshCards();
+        refreshTable();
+    }
 }

@@ -472,4 +472,9 @@ public class StudentManagePanel extends JPanel {
 	    bar.add(saveBtn);
 	    return bar;
 	}
+	
+	//메인에서 쓸 refresh 메소드
+    public void refresh() {
+        refreshTable();
+    }
 }

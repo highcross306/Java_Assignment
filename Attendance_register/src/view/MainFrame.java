@@ -25,6 +25,12 @@ public class MainFrame extends JFrame{
 	private final String[] MENU_LABELS = {"대시보드", "반 관리", "학생 관리", "출석 입력", "출석 달력", "엑셀 내보개기"}; //메뉴 이름들
 	private final String[] CARD_KEYS = {"dashboard", "class", "student", "attendance", "calendar", "excel"}; //메뉴 구분 키
 	private final String[] ICONS = {"■ ", "● ", "◆ ", "□ ", "◇ ", "▼ "}; //메뉴 아이콘
+	
+	//페이지 초기화를 위한 필드들
+	private DashboardPanel      dashboardPanel;
+	private ClassManagePanel    classPanel;
+	private StudentManagePanel  studentPanel;
+	private AttendanceInputPanel attendancePanel;
 
 	public MainFrame() {
 		super("학원 출석 관리 프로그램");
@@ -133,18 +139,24 @@ public class MainFrame extends JFrame{
 	
 	//패널 선택 시 불러오는 페이지들 지정
 	private JPanel buildContent() {
-		cardLayout = new CardLayout();
-		contentPanel = new JPanel(cardLayout);
-		contentPanel.setBackground(BG);
-		
-		contentPanel.add(new DashboardPanel(), "dashboard");
-        contentPanel.add(new ClassManagePanel(), "class");
-        contentPanel.add(new StudentManagePanel(), "student");
-        contentPanel.add(new AttendanceInputPanel(), "attendance");
-        contentPanel.add(new AttendanceCalendarPanel(), "calendar");
-        contentPanel.add(new ExcelExportPanel(), "excel");
- 
-        return contentPanel;
+	    cardLayout = new CardLayout();
+	    contentPanel = new JPanel(cardLayout);
+	    contentPanel.setBackground(BG);
+	    
+	    //각 페이지 정의
+	    dashboardPanel   = new DashboardPanel();
+	    classPanel       = new ClassManagePanel();
+	    studentPanel     = new StudentManagePanel();
+	    attendancePanel  = new AttendanceInputPanel();
+
+	    contentPanel.add(dashboardPanel,              "dashboard");
+	    contentPanel.add(classPanel,                  "class");
+	    contentPanel.add(studentPanel,                "student");
+	    contentPanel.add(attendancePanel,             "attendance");
+	    contentPanel.add(new AttendanceCalendarPanel(), "calendar");
+	    contentPanel.add(new ExcelExportPanel(),        "excel");
+
+	    return contentPanel;
 	}
 	
 	//메뉴 전환
@@ -161,5 +173,13 @@ public class MainFrame extends JFrame{
 			}
 		}
 		cardLayout.show(contentPanel,  CARD_KEYS[idx]); //메뉴에 해당되는 페이지 띄우기
+		
+		 // 화면 전환 시 데이터 갱신
+	    switch (idx) { //인덱스 번호를 통해서 해당 화면 초기화
+	        case 0 -> dashboardPanel.refresh();
+	        case 1 -> classPanel.refresh();
+	        case 2 -> studentPanel.refresh();
+	        case 3 -> attendancePanel.refresh();
+	    }
 	}
 }
