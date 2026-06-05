@@ -31,6 +31,7 @@ public class MainFrame extends JFrame{
 	private ClassManagePanel    classPanel;
 	private StudentManagePanel  studentPanel;
 	private AttendanceInputPanel attendancePanel;
+	private AttendanceCalendarPanel calendarPanel;
 
 	public MainFrame() {
 		super("학원 출석 관리 프로그램");
@@ -148,12 +149,13 @@ public class MainFrame extends JFrame{
 	    classPanel       = new ClassManagePanel();
 	    studentPanel     = new StudentManagePanel();
 	    attendancePanel  = new AttendanceInputPanel();
+	    calendarPanel = new AttendanceCalendarPanel();
 
 	    contentPanel.add(dashboardPanel,              "dashboard");
 	    contentPanel.add(classPanel,                  "class");
 	    contentPanel.add(studentPanel,                "student");
 	    contentPanel.add(attendancePanel,             "attendance");
-	    contentPanel.add(new AttendanceCalendarPanel(), "calendar");
+	    contentPanel.add(calendarPanel, "calendar");
 	    contentPanel.add(new ExcelExportPanel(),        "excel");
 
 	    return contentPanel;
@@ -180,6 +182,7 @@ public class MainFrame extends JFrame{
 	        case 1 -> classPanel.refresh();
 	        case 2 -> studentPanel.refresh();
 	        case 3 -> attendancePanel.refresh();
+	        case 4 -> calendarPanel.refresh();
 	    }
 	}
 }
