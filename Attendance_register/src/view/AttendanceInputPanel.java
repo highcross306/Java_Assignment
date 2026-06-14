@@ -136,7 +136,7 @@ public class AttendanceInputPanel extends JPanel {
         table.getColumnModel().getColumn(0).setPreferredWidth(50);
         table.getColumnModel().getColumn(0).setMaxWidth(50);
         table.getColumnModel().getColumn(1).setPreferredWidth(80);
-        table.getColumnModel().getColumn(2).setPreferredWidth(100);
+        table.getColumnModel().getColumn(2).setPreferredWidth(150);
         table.getColumnModel().getColumn(3).setPreferredWidth(200);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
