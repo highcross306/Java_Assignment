@@ -27,6 +27,9 @@ public class ExcelExportPanel extends JPanel {
     //미리보기 테이블
     private DefaultTableModel tableModel;
     private JTable table;
+
+    //엑셀 추출 버튼 (작업 중 비활성화 처리를 위해 필드로 보관)
+    private JButton exportBtn;
     
     //엑셀 페이지 생성자
     public ExcelExportPanel() {
@@ -210,7 +213,7 @@ public class ExcelExportPanel extends JPanel {
         previewBtn.addActionListener(e -> refreshPreview()); //미리보기 다시 불러오기
         
         // 엑셀 추출 버튼
-        JButton exportBtn = new JButton("엑셀 추출"); 
+        exportBtn = new JButton("엑셀 추출"); 
         exportBtn.setFont(new Font("맑은 고딕", Font.BOLD, 12));
         exportBtn.setBackground(BLUE);
         exportBtn.setForeground(WHITE);
@@ -360,6 +363,64 @@ public class ExcelExportPanel extends JPanel {
             file = new java.io.File(file.getAbsolutePath() + ".xlsx");
         }
 
+        final java.io.File targetFile = file;
+
+        // 버튼 비활성화 + 진행 중 표시 (작업 중 중복 클릭 방지)
+        exportBtn.setEnabled(false);
+        exportBtn.setText("추출 중...");
+
+        // 진행 중임을 알리는 non-modal 다이얼로그
+        // modal=false 이므로 떠 있는 동안에도 메인 창(다른 탭, 메뉴 등) 조작 가능
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        JDialog progressDialog = new JDialog(owner, "엑셀 추출 중", Dialog.ModalityType.MODELESS);
+        JPanel progressPanel = new JPanel(new BorderLayout(0, 10));
+        progressPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        JLabel progressLabel = new JLabel("엑셀 파일을 생성하고 있습니다...");
+        progressLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 13));
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true); // 진행률을 알 수 없으므로 무한 반복 애니메이션
+        progressPanel.add(progressLabel, BorderLayout.NORTH);
+        progressPanel.add(progressBar, BorderLayout.CENTER);
+        progressDialog.getContentPane().add(progressPanel);
+        progressDialog.pack();
+        progressDialog.setLocationRelativeTo(this);
+        progressDialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+        progressDialog.setVisible(true);
+        // setVisible(true)는 non-modal이므로 즉시 리턴됨 -> 아래 코드 계속 실행
+
+        // 엑셀 생성은 시간이 걸릴 수 있으므로 백그라운드 스레드(SwingWorker)에서 처리
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                generateExcelFile(targetFile, start, end, selectedClasses);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                // UI 갱신은 done()에서 (EDT 보장)
+                progressDialog.dispose();
+                exportBtn.setEnabled(true);
+                exportBtn.setText("엑셀 추출");
+                try {
+                    get(); // doInBackground에서 발생한 예외 확인
+                    JOptionPane.showMessageDialog(ExcelExportPanel.this,
+                        "저장 완료: " + targetFile.getAbsolutePath(),
+                        "완료", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(ExcelExportPanel.this,
+                        "추출 실패: " + ex.getCause(),
+                        "오류", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    //실제 엑셀 워크북 생성 및 파일 저장 (백그라운드 스레드에서 실행됨)
+    private void generateExcelFile(java.io.File file, java.time.LocalDate start, java.time.LocalDate end,
+                                    java.util.List<Class_Info> selectedClasses) throws Exception {
+
         // 엑셀 생성
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
 
@@ -485,15 +546,6 @@ public class ExcelExportPanel extends JPanel {
             try (java.io.FileOutputStream fos = new java.io.FileOutputStream(file)) {
                 workbook.write(fos);
             }
-
-            JOptionPane.showMessageDialog(this,
-                "저장 완료: " + file.getAbsolutePath(),
-                "완료", JOptionPane.INFORMATION_MESSAGE);
-
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                "추출 실패: " + ex.getMessage(),
-                "오류", JOptionPane.ERROR_MESSAGE);
         }
     }
     
