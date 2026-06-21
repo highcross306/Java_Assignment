@@ -29,3 +29,5 @@ student_id,class_id,date,status,reason
 6,3,2026-06-14,EARLY_LEAVE,
 1,1,2026-06-14,PRESENT,
 2,1,2026-06-14,LATE,테스트
+1,1,2026-06-16,ABSENT,
+2,1,2026-06-16,EXCUSED,

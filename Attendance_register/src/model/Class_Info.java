@@ -14,6 +14,10 @@ public class Class_Info {
 		student_list=new Vector<>();
 	}
 	
+	public void addStudent(Student student) {
+		student_list.add(student);
+	}
+	
 	public void setClass_Id(int class_id) {
 		this.class_id=class_id;
 	}
@@ -28,7 +32,5 @@ public class Class_Info {
 		return class_name;
 	}
 	
-	public void addStudent(Student student) {
-		student_list.add(student);
-	}
+	
 }

@@ -274,6 +274,7 @@ public class ExcelExportPanel extends JPanel {
         java.util.List<String> columns = new java.util.ArrayList<>();
         columns.add("반");
         columns.add("이름");
+        
         java.time.LocalDate d = start;
         while (!d.isAfter(end)) { //모든 날짜를 열에 추가
             columns.add(d.toString());
@@ -286,7 +287,7 @@ public class ExcelExportPanel extends JPanel {
         for (Class_Info cls : selectedClasses) {
             for (Student s : DataManager.getStudent()) {
                 if (s.getClass_Id() != cls.getClass_Id()) continue; //선택된 반만 미리보기에 표시
-                java.util.List<Object> row = new java.util.ArrayList<>();
+                java.util.List<Object> row = new java.util.ArrayList<>(); //행을 생성
                 row.add(cls.getClass_Name());
                 row.add(s.getName());
                 java.time.LocalDate date = start; //시작 날짜로 지정
@@ -370,15 +371,15 @@ public class ExcelExportPanel extends JPanel {
         exportBtn.setText("추출 중...");
 
         // 진행 중임을 알리는 non-modal 다이얼로그
-        // modal=false 이므로 떠 있는 동안에도 메인 창(다른 탭, 메뉴 등) 조작 가능
+        // modal=false 이므로 떠 있는 동안에도 메인 창(다른 탭, 메뉴 등) 조작 가능-부모창으로부터 자유
         Window owner = SwingUtilities.getWindowAncestor(this);
-        JDialog progressDialog = new JDialog(owner, "엑셀 추출 중", Dialog.ModalityType.MODELESS);
+        JDialog progressDialog = new JDialog(owner, "엑셀 추출 중", Dialog.ModalityType.MODELESS); //진행도를 확인하기 위한 다이얼로그
         JPanel progressPanel = new JPanel(new BorderLayout(0, 10));
         progressPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
         JLabel progressLabel = new JLabel("엑셀 파일을 생성하고 있습니다...");
         progressLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 13));
         JProgressBar progressBar = new JProgressBar();
-        progressBar.setIndeterminate(true); // 진행률을 알 수 없으므로 무한 반복 애니메이션
+        progressBar.setIndeterminate(true); // 진행률을 알 수 없으므로 무한 반복 애니메이션, 바에서 좌우로 계속해서 움직인다.
         progressPanel.add(progressLabel, BorderLayout.NORTH);
         progressPanel.add(progressBar, BorderLayout.CENTER);
         progressDialog.getContentPane().add(progressPanel);
@@ -424,13 +425,12 @@ public class ExcelExportPanel extends JPanel {
         // 엑셀 생성
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
 
-            // 헤더 스타일
-            org.apache.poi.ss.usermodel.CellStyle headerStyle =workbook.createCellStyle();
-            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
+            org.apache.poi.ss.usermodel.CellStyle headerStyle =workbook.createCellStyle(); //헤더스타일은 한 번만 만들어서 재사용한다.
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont(); //헤더폰트는 한 번만 만들어서 재사용한다.
+            headerFont.setBold(true); //글씨 굵게
             headerStyle.setFont(headerFont);
             headerStyle.setFillForegroundColor( new org.apache.poi.xssf.usermodel.XSSFColor(
-                    new byte[]{(byte)37, (byte)99, (byte)235}, null)); //색깔 RGB( , , )로 지정
+                    new byte[]{(byte)37, (byte)99, (byte)235}, null)); //색깔 RGB( , , )로 지정(파란색) 
             headerStyle.setFillPattern( //채우기
                 org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
             headerFont.setColor(org.apache.poi.ss.usermodel.IndexedColors.WHITE.getIndex());
@@ -439,15 +439,14 @@ public class ExcelExportPanel extends JPanel {
 
             // 반별 시트 생성
             for (Class_Info cls : selectedClasses) { //선택된 반별로 시트 생성
-                org.apache.poi.xssf.usermodel.XSSFSheet sheet =
-                    workbook.createSheet(cls.getClass_Name());
+                org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet(cls.getClass_Name()); //반 이름으로 시트 생성
 
                 // 헤더 행 — 이름 + 날짜들 + 통계
-                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0); //헤더 행 생성
                 int col = 0;
-                headerRow.createCell(col++).setCellValue("이름");
+                headerRow.createCell(col++).setCellValue("이름");//헤더에 이름 추가
 
-                java.util.List<java.time.LocalDate> dates = new java.util.ArrayList<>();
+                java.util.List<java.time.LocalDate> dates = new java.util.ArrayList<>(); //헤더에 날짜들 추가
                 java.time.LocalDate d = start;
                 while (!d.isAfter(end)) {
                     dates.add(d);
@@ -457,7 +456,7 @@ public class ExcelExportPanel extends JPanel {
                     d = d.plusDays(1);
                 }
                 // 통계 헤더
-                for (String stat : new String[]{"출석", "지각", "결석", "조퇴", "공결"}) {
+                for (String stat : new String[]{"출석", "지각", "결석", "조퇴", "공결"}) { //헤더에 각 출결 결과 추가
                     org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(col++);
                     cell.setCellValue(stat);
                     cell.setCellStyle(headerStyle);
@@ -467,14 +466,14 @@ public class ExcelExportPanel extends JPanel {
                 // 학생별 행
                 int rowIdx = 1;
                 for (Student s : DataManager.getStudent()) {
-                    if (s.getClass_Id() != cls.getClass_Id()) continue;
-                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                    if (s.getClass_Id() != cls.getClass_Id()) continue; //선택된 반의 데이터만 사용
+                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++); //학생 정보를 위한 행을 생성
                     col = 0;
-                    row.createCell(col++).setCellValue(s.getName());
+                    row.createCell(col++).setCellValue(s.getName()); //
 
                     int present = 0, late = 0, absent = 0, earlyLeave = 0, excused = 0;
                     for (java.time.LocalDate date : dates) { //통계 계산
-                        String status = getStatusStr(s.getStudent_id(), date);
+                        String status = getStatusStr(s.getStudent_id(), date); //학생과 날짜를 입려 받아서 상태를 String 타입으로 받기
                         row.createCell(col++).setCellValue(status);
                         switch (status) {
                             case "출석" -> present++;

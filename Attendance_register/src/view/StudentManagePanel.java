@@ -430,11 +430,11 @@ public class StudentManagePanel extends JPanel {
 		        	if (school.isEmpty()) throw new Exception("학교를 입력하세요."); //학교 필수 입력 예외 처리
 		        	if (selIdx == 0) throw new Exception("반을 선택하세요."); // 반 필수 선택 예외 처리
 		        	
-		            int classId = DataManager.getClasses().get(selIdx - 1).getClass_Id();
+		            int classId = DataManager.getClasses().get(selIdx - 1).getClass_Id(); //플레이스 홀더를 재외해야 하므로 selIdx - 1 계산을 수행
 	
 		            if (existing == null) {
 		                // 추가 모드
-		                Student s = new Student(name, school, classId);
+		                Student s = new Student(name, school, classId); //Student 객체를 새로 생성
 		                s.setStudent_Id(DataManager.getNextStudentId()); //새로 추가할 학생의 id를 자동으로 받는다.
 		                s.setStudent_Phone(phone);
 		                s.setGuardian_Phone(guardian);

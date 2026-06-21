@@ -243,7 +243,7 @@ public class ClassManagePanel extends JPanel{
 		// 통계 카드 갱신
 	    if (classCountLabel != null) {
 	        classCountLabel.setText(String.valueOf(DataManager.getClasses().size()));
-	        studentCountLabel.setText(String.valueOf(DataManager.getStudent().size()));
+	        studentCountLabel.setText(String.valueOf(DataManager.getStudent().size())); 
 	    }
 	}
 	
@@ -421,7 +421,7 @@ public class ClassManagePanel extends JPanel{
 	        JOptionPane.WARNING_MESSAGE
 	    );
 
-	    if (result == JOptionPane.YES_OPTION) {
+	    if (result == JOptionPane.YES_OPTION) { //삭제 다이얼로그에서 '예'를 눌렀을 때
 	        // 해당 반 학생 먼저 삭제
 	        DataManager.getStudent().removeIf(
 	            s -> s.getClass_Id() == classId
@@ -431,7 +431,7 @@ public class ClassManagePanel extends JPanel{
 	        DataManager.getClasses().removeIf(
 	            cls -> cls.getClass_Id() == classId
 	        );
-	        DataManager.saveAll(); // 즉시 저장
+	        DataManager.saveAll(); // CSV로 즉시 저장
 	        refreshTable(); // 테이블 갱신
 	    }
 	}

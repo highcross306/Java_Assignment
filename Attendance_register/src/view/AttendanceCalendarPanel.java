@@ -287,7 +287,7 @@ public class AttendanceCalendarPanel extends JPanel {
             for (AttendanceRecord r : DataManager.getRecords()) { //출결 기록에 따라서 글자를 출력한다.
                 if (r.getStudent_Id() == student.getStudent_id() &&
                         r.getDate().equals(date)) {
-                	switch (r.getStatus()) { //출결 상태에 따라서 글자와 테두리와 칸의 색깔이 변한다.
+                	switch (r.getStatus()) { //출결 상태에 따라서 글자와 테두리와 칸의 색깔이 변한다. 각각 위에서부터 글자색, 배경색, 테두리이다.
                     case PRESENT -> {
                         statusLbl.setText("출석"); //출석 상태일때의 테두리 변화
                         statusLbl.setForeground(new Color(21, 128, 61));
@@ -524,13 +524,13 @@ public class AttendanceCalendarPanel extends JPanel {
 
         // 통계 계산 (합산)
         Student student = getSelectedStudent();
-        int present = 0, late = 0, absent = 0, earlyLeave = 0, excused = 0;
+        int present = 0, late = 0, absent = 0, earlyLeave = 0, excused = 0; //모든 횟수 초기화
 
         if (student != null) {
             for (AttendanceRecord r : DataManager.getRecords()) {
-                if (r.getStudent_Id() == student.getStudent_id() &&
-                        r.getDate().getYear()  == currentMonth.getYear() &&
-                        r.getDate().getMonthValue() == currentMonth.getMonthValue()) {
+                if (r.getStudent_Id() == student.getStudent_id() && //학생 아이디 일치
+                        r.getDate().getYear()  == currentMonth.getYear() && //년도 일치
+                        r.getDate().getMonthValue() == currentMonth.getMonthValue()) { //달 일치
                     switch (r.getStatus()) {
                         case PRESENT     -> present++;
                         case LATE        -> late++;

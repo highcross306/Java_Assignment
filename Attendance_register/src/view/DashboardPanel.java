@@ -142,7 +142,7 @@ public class DashboardPanel extends JPanel {
     }
     
     //요약카드 초기화
-    private void refreshCards() {
+    private void refreshCards() { //DataManager의 countTodayByStatus를 통해 해당 출결 상태의 학생 수를 계산 후, 레이블의 텍스트를 변경
         totalLabel.setText(String.valueOf(DataManager.getStudent().size()));
         presentLabel.setText(String.valueOf(DataManager.countTodayByStatus(AttendanceStatus.PRESENT)));
         lateLabel.setText(String.valueOf(DataManager.countTodayByStatus(AttendanceStatus.LATE)));
@@ -203,12 +203,12 @@ public class DashboardPanel extends JPanel {
                 lbl.setBackground(sel ? new Color(239, 246, 255) : WHITE);
                 // 상태별 색상
                 switch (val == null ? "" : val.toString()) {
-                    case "출석" -> lbl.setForeground(new Color(21,  128, 61));
-                    case "지각" -> lbl.setForeground(new Color(161, 98,  7));
-                    case "결석" -> lbl.setForeground(new Color(185, 28,  28));
-                    case "조퇴" -> lbl.setForeground(new Color(37,  99,  235));
-                    case "공결" -> lbl.setForeground(new Color(107, 114, 128));
-                    default    -> lbl.setForeground(new Color(17,  24,  39));
+                    case "출석" -> lbl.setForeground(new Color(21,  128, 61));//초록
+                    case "지각" -> lbl.setForeground(new Color(161, 98,  7));//주황
+                    case "결석" -> lbl.setForeground(new Color(185, 28,  28));//빨강
+                    case "조퇴" -> lbl.setForeground(new Color(37,  99,  235));//파랑
+                    case "공결" -> lbl.setForeground(new Color(107, 114, 128));//회색
+                    default    -> lbl.setForeground(new Color(17,  24,  39));//기본 검정
                 }
                 return lbl;
             }

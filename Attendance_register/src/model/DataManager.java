@@ -16,6 +16,7 @@ public class DataManager {
 	//Hashmap으로 빠른 검색
 	private static HashMap<Integer, Student>   studentMap = new HashMap<>();
 	private static HashMap<Integer, Class_Info> classMap  = new HashMap<>();
+	
 	//프로그램 시작 시 호출, 전체 로드
 	public static void loadAll() {
 		loadClasses();
@@ -39,7 +40,7 @@ public class DataManager {
 			return;
 		}
 		//파일을 바이트 단위로 읽고, 바이트를 UTF-8로 변환하고, readLine()으로 한 줄씩 감쌈
-		try(BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"))){
+		try(BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"))){ //try-with-resources를 통해서 블록이 끝나면 안전하게 BufferedReader를 close()
 			String line;
 			br.readLine(); //헤더 스킵
 			while((line = br.readLine()) != null) { //줄이 없을 때까지 반복
@@ -179,18 +180,18 @@ public class DataManager {
     //오늘 status 상태의 학생 수
     public static int countTodayByStatus(AttendanceStatus status) {
     	int count = 0;
-    	for(AttendanceRecord r: getTodayRecords()) {
+    	for(AttendanceRecord r: getTodayRecords()) { //오늘 날짜를 불러와서 오늘의 record만 확인
     		if (r.getStatus() == status) count++;
     	}
     	return count;
     }
-    //student_id로 학생 조회
+    //student_id로 학생 조회 - HashMap에서 즉시 꺼내온다.
     public static Student findStudentById(int id) {
     	return studentMap.get(id);
     }
     //class_id로 반 조회
     public static Class_Info findClassById(int id) {
-    	return classMap.get(id); //없다명 null 반환
+    	return classMap.get(id); //없다면 null 반환
     }
     
     //출석 기록 추가/수정

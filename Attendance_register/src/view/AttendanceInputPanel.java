@@ -30,7 +30,7 @@ public class AttendanceInputPanel extends JPanel {
     private DefaultTableModel tableModel;
     private JTable table;
     
-    // 학생 id → 출결상태/사유 임시 저장
+    //해시 맵을 이용해서 출결상태/사유 임시 저장
     private HashMap<Integer, String> statusMap  = new HashMap<>();
     private HashMap<Integer, String> reasonMap  = new HashMap<>();
     
@@ -242,7 +242,7 @@ public class AttendanceInputPanel extends JPanel {
         statusMap.clear();
         reasonMap.clear();
         for (AttendanceRecord r : DataManager.getRecords()) {
-            if (r.getDate().equals(date)) {
+            if (r.getDate().equals(date)) { //현재 선택된 날짜와 일치하는 기록만 불러오기
                 String statusStr = switch (r.getStatus()) {
                     case LATE        -> "지각";
                     case ABSENT      -> "결석";
@@ -250,8 +250,8 @@ public class AttendanceInputPanel extends JPanel {
                     case EXCUSED     -> "공결";
                     default          -> "출석";
                 };
-                statusMap.put(r.getStudent_Id(), statusStr);
-                reasonMap.put(r.getStudent_Id(), r.getReason() == null ? "" : r.getReason());
+                statusMap.put(r.getStudent_Id(), statusStr); //상태 맵에 저장
+                reasonMap.put(r.getStudent_Id(), r.getReason() == null ? "" : r.getReason()); //사유 맵에 저장
             }
         }
 
@@ -338,9 +338,7 @@ public class AttendanceInputPanel extends JPanel {
     private void saveAttendance() {
         // 날짜 변환
         Date selected = (Date) dateSpinner.getValue();
-        LocalDate date = selected.toInstant()
-            .atZone(java.time.ZoneId.systemDefault())
-            .toLocalDate();
+        LocalDate date = selected.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate(); //오늘 날짜를 LocalDate 타입으로 변환
 
         int selIdx = classCombo.getSelectedIndex();
         Class_Info selectedClass = DataManager.getClasses().get(selIdx);
@@ -352,8 +350,7 @@ public class AttendanceInputPanel extends JPanel {
         for (int row = 0; row < tableModel.getRowCount(); row++) {
             int studentId = (int) tableModel.getValueAt(row, 0);
             String statusStr = (String) tableModel.getValueAt(row, 2);
-            String reason   = tableModel.getValueAt(row, 3) == null ? ""
-                            : tableModel.getValueAt(row, 3).toString();
+            String reason   = tableModel.getValueAt(row, 3) == null ? "" : tableModel.getValueAt(row, 3).toString(); //사유는 비어 있으면 ""을 저장
 
             // 출결 상태 문자열 → enum 변환
             AttendanceStatus status = switch (statusStr) {
