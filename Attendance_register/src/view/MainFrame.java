@@ -3,6 +3,7 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import model.DataManager;
 
 public class MainFrame extends JFrame{
 	//직렬화 아이디 선언(gui에서는 사용하지 않음)
@@ -66,7 +67,43 @@ public class MainFrame extends JFrame{
 		sidebar.setBorder(BorderFactory.createMatteBorder(0,  0,  0,  1,  BORDER)); //오른쪽에만 선을 그음, 색깔은 BORDER
 		sidebar.add(buildLogo(), BorderLayout.NORTH);
 		sidebar.add(buildMenuPanel(), BorderLayout.CENTER);
+		sidebar.add(buildRefreshButton(), BorderLayout.SOUTH); //하단에 새로고침 버튼 추가
 		return sidebar;
+	}
+	
+	//새로고침 버튼 생성 (서버에서 최신 데이터를 다시 불러와 현재 화면 갱신)
+	private JPanel buildRefreshButton() {
+		JPanel panel = new JPanel(new BorderLayout());
+		panel.setBackground(WHITE);
+		panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 12, 12));
+		
+		JButton refreshBtn = new JButton("⟳ 새로고침");
+		refreshBtn.setFont(new Font("맑은 고딕", Font.BOLD, 13));
+		refreshBtn.setForeground(WHITE);
+		refreshBtn.setBackground(BLUE);
+		refreshBtn.setFocusPainted(false);
+		refreshBtn.setBorderPainted(false);
+		refreshBtn.setOpaque(true);
+		refreshBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		refreshBtn.setPreferredSize(new Dimension(0, 40));
+		
+		refreshBtn.addActionListener(e -> refreshCurrentPanel()); //클릭 시 현재 화면 새로고침
+		
+		panel.add(refreshBtn, BorderLayout.CENTER);
+		return panel;
+	}
+	
+	//현재 보고 있는 화면을 서버 최신 데이터로 갱신
+	private void refreshCurrentPanel() {
+		DataManager.loadAll(); //서버에서 데이터 다시 불러오기
+		switch (currentIdx) {
+			case 0 -> dashboardPanel.refresh();
+			case 1 -> classPanel.refresh();
+			case 2 -> studentPanel.refresh();
+			case 3 -> attendancePanel.refresh();
+			case 4 -> calendarPanel.refresh();
+			case 5 -> excelPanel.refresh();
+		}
 	}
 	
 	//좌측 상단 로고 생성
@@ -178,6 +215,9 @@ public class MainFrame extends JFrame{
 			}
 		}
 		cardLayout.show(contentPanel,  CARD_KEYS[idx]); //메뉴에 해당되는 페이지 띄우기
+		
+		// 화면 전환 시 서버에서 최신 데이터를 다시 불러옴 (다른 기기에서 변경한 내용 반영)
+		DataManager.loadAll();
 		
 		 // 화면 전환 시 데이터 갱신
 	    switch (idx) { //인덱스 번호를 통해서 해당 화면 초기화
