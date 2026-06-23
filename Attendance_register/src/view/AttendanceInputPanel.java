@@ -298,10 +298,9 @@ public class AttendanceInputPanel extends JPanel {
                 int selIdx = classCombo.getSelectedIndex();
                 Class_Info selectedClass = DataManager.getClasses().get(selIdx);
 
-                // 해당 날짜 + 해당 반의 출석 기록 삭제
-                DataManager.getRecords().removeIf(r ->
-                    r.getDate().equals(date) &&
-                    r.getClass_Id() == selectedClass.getClass_Id()
+                // 해당 날짜 + 해당 반의 출석 기록 삭제 (로컬 + 서버 동시 반영)
+                DataManager.deleteRecordsByClassAndDate(
+                    selectedClass.getClass_Id(), date
                 );
 
                 // 임시 저장 맵 초기화
