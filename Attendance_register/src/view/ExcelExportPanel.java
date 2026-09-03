@@ -460,6 +460,19 @@ public class ExcelExportPanel extends JPanel {
             classLabelStyle.setFillPattern(
                 org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
 
+            // 결석/공결이 있는 학생의 해당 통계 셀을 강조하는 빨간색 스타일
+            org.apache.poi.ss.usermodel.CellStyle redStyle = workbook.createCellStyle();
+            redStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.RED.getIndex());
+            redStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+            org.apache.poi.ss.usermodel.Font redFont = workbook.createFont();
+            redFont.setColor(org.apache.poi.ss.usermodel.IndexedColors.WHITE.getIndex());
+            redStyle.setFont(redFont);
+
+            // 출석만 있는 학생(개근)의 출석 셀을 강조하는 노란색 스타일
+            org.apache.poi.ss.usermodel.CellStyle yellowStyle = workbook.createCellStyle();
+            yellowStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.YELLOW.getIndex());
+            yellowStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+
             // 모든 반이 한 시트에 표시됨
             org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet("출석부");
             org.apache.poi.ss.usermodel.Drawing<?> drawing = sheet.createDrawingPatriarch(); //사유 메모(코멘트)를 달기 위한 드로잉 영역
@@ -547,11 +560,26 @@ public class ExcelExportPanel extends JPanel {
 
                     // 통계 값 채우기 (이름 바로 뒤 열)
                     int sc = statStartCol;
-                    row.createCell(sc++).setCellValue(present);
+                    org.apache.poi.ss.usermodel.Cell presentCell = row.createCell(sc++);
+                    presentCell.setCellValue(present);
                     row.createCell(sc++).setCellValue(late);
-                    row.createCell(sc++).setCellValue(absent);
+                    org.apache.poi.ss.usermodel.Cell absentCell = row.createCell(sc++);
+                    absentCell.setCellValue(absent);
                     row.createCell(sc++).setCellValue(earlyLeave);
-                    row.createCell(sc++).setCellValue(excused);
+                    org.apache.poi.ss.usermodel.Cell excusedCell = row.createCell(sc++);
+                    excusedCell.setCellValue(excused);
+
+                    // 결석/공결이 하나라도 있으면 해당 셀을 빨간색으로 강조
+                    if (absent > 0) {
+                        absentCell.setCellStyle(redStyle);
+                    }
+                    if (excused > 0) {
+                        excusedCell.setCellStyle(redStyle);
+                    }
+                    // 지각/결석/조퇴/공결 없이 출석만 있는(개근) 학생은 출석 셀을 노란색으로 강조
+                    if (present > 0 && late == 0 && absent == 0 && earlyLeave == 0 && excused == 0) {
+                        presentCell.setCellStyle(yellowStyle);
+                    }
 
                     totalPresent += present;
                     totalLate += late;
