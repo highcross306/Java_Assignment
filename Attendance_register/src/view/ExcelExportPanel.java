@@ -317,7 +317,17 @@ public class ExcelExportPanel extends JPanel {
         }
         return ""; //없으면 빈칸으로 반환
     }
-    
+
+    //각 날짜의 결석/지각 등 사유 불러오기
+    private String getReasonStr(int studentId, java.time.LocalDate date) {
+        for (AttendanceRecord r : DataManager.getRecords()) {
+            if (r.getStudent_Id() == studentId && r.getDate().equals(date)) {
+                return r.getReason();
+            }
+        }
+        return null; //없으면 null로 반환
+    }
+
     //선택 된 반 가져오기
     private java.util.List<Class_Info> getSelectedClasses() {
         java.util.List<Class_Info> result = new java.util.ArrayList<>();
@@ -440,6 +450,8 @@ public class ExcelExportPanel extends JPanel {
             // 반별 시트 생성
             for (Class_Info cls : selectedClasses) { //선택된 반별로 시트 생성
                 org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet(cls.getClass_Name()); //반 이름으로 시트 생성
+                org.apache.poi.ss.usermodel.Drawing<?> drawing = sheet.createDrawingPatriarch(); //사유 메모(코멘트)를 달기 위한 드로잉 영역
+                org.apache.poi.ss.usermodel.CreationHelper helper = workbook.getCreationHelper();
 
                 // 헤더 행 — 이름 + 날짜들 + 통계
                 org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0); //헤더 행 생성
@@ -474,7 +486,23 @@ public class ExcelExportPanel extends JPanel {
                     int present = 0, late = 0, absent = 0, earlyLeave = 0, excused = 0;
                     for (java.time.LocalDate date : dates) { //통계 계산
                         String status = getStatusStr(s.getStudent_id(), date); //학생과 날짜를 입려 받아서 상태를 String 타입으로 받기
-                        row.createCell(col++).setCellValue(status);
+                        org.apache.poi.ss.usermodel.Cell dateCell = row.createCell(col++);
+                        dateCell.setCellValue(status);
+
+                        // 사유가 입력된 날짜는 셀에 메모(코멘트)로 사유 표시 (기본적으로 접힌/숨김 상태)
+                        String reason = getReasonStr(s.getStudent_id(), date);
+                        if (reason != null && !reason.isBlank()) {
+                            org.apache.poi.ss.usermodel.ClientAnchor anchor = helper.createClientAnchor();
+                            anchor.setCol1(dateCell.getColumnIndex());
+                            anchor.setCol2(dateCell.getColumnIndex() + 2);
+                            anchor.setRow1(row.getRowNum());
+                            anchor.setRow2(row.getRowNum() + 3);
+                            org.apache.poi.ss.usermodel.Comment comment = drawing.createCellComment(anchor);
+                            comment.setString(helper.createRichTextString(reason));
+                            comment.setVisible(false); // 메모 기본 상태를 접힘(숨김)으로 설정
+                            dateCell.setCellComment(comment);
+                        }
+
                         switch (status) {
                             case "출석" -> present++;
                             case "지각" -> late++;
