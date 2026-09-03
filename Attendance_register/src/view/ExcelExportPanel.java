@@ -450,15 +450,11 @@ public class ExcelExportPanel extends JPanel {
             headerStyle.setAlignment(
                 org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
 
-            // 반 구분 라벨 스타일 (반별로 시트를 나누지 않는 대신 이 행으로 반을 구분)
+            // 반 구분 라벨 스타일 (반별로 시트를 나누지 않는 대신 이 행으로 반을 구분, 배경색 없이 굵은 글씨만 적용)
             org.apache.poi.ss.usermodel.CellStyle classLabelStyle = workbook.createCellStyle();
             org.apache.poi.ss.usermodel.Font classLabelFont = workbook.createFont();
             classLabelFont.setBold(true);
             classLabelStyle.setFont(classLabelFont);
-            classLabelStyle.setFillForegroundColor(new org.apache.poi.xssf.usermodel.XSSFColor(
-                    new byte[]{(byte)229, (byte)231, (byte)235}, null)); //연한 회색
-            classLabelStyle.setFillPattern(
-                org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
 
             // 결석/공결이 있는 학생의 해당 통계 셀을 강조하는 빨간색 스타일
             org.apache.poi.ss.usermodel.CellStyle redStyle = workbook.createCellStyle();
@@ -510,14 +506,11 @@ public class ExcelExportPanel extends JPanel {
             int rowIdx = 1;
             for (Class_Info cls : selectedClasses) { //선택된 반별로 데이터 블록 생성, 반 사이는 빈 행으로 구분
 
-                // 반 구분 라벨 행
+                // 반 구분 라벨 행 (이름 열에만 반 이름 표시, 나머지는 비워둠)
                 org.apache.poi.ss.usermodel.Row classRow = sheet.createRow(rowIdx++);
-                for (int i = 0; i < totalCols; i++) {
-                    classRow.createCell(i).setCellStyle(classLabelStyle);
-                }
-                classRow.getCell(0).setCellValue(cls.getClass_Name());
-
-                int totalPresent = 0, totalLate = 0, totalAbsent = 0, totalEarlyLeave = 0, totalExcused = 0;
+                org.apache.poi.ss.usermodel.Cell classLabelCell = classRow.createCell(0);
+                classLabelCell.setCellValue(cls.getClass_Name());
+                classLabelCell.setCellStyle(classLabelStyle);
 
                 // 학생별 행
                 for (Student s : DataManager.getStudent()) {
@@ -580,23 +573,7 @@ public class ExcelExportPanel extends JPanel {
                     if (present > 0 && late == 0 && absent == 0 && earlyLeave == 0 && excused == 0) {
                         presentCell.setCellStyle(yellowStyle);
                     }
-
-                    totalPresent += present;
-                    totalLate += late;
-                    totalAbsent += absent;
-                    totalEarlyLeave += earlyLeave;
-                    totalExcused += excused;
                 }
-
-                // 반 전체 합계 행
-                org.apache.poi.ss.usermodel.Row totalRow = sheet.createRow(rowIdx++);
-                totalRow.createCell(0).setCellValue("합계");
-                int sc = 1;
-                totalRow.createCell(sc++).setCellValue(totalPresent);
-                totalRow.createCell(sc++).setCellValue(totalLate);
-                totalRow.createCell(sc++).setCellValue(totalAbsent);
-                totalRow.createCell(sc++).setCellValue(totalEarlyLeave);
-                totalRow.createCell(sc++).setCellValue(totalExcused);
 
                 // 다음 반과 구분하기 위한 빈 행
                 rowIdx++;
