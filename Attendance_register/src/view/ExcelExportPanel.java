@@ -428,6 +428,9 @@ public class ExcelExportPanel extends JPanel {
         worker.execute();
     }
 
+    //출결 통계 라벨 (이름 바로 뒤, 날짜들 앞에 배치)
+    private static final String[] STAT_LABELS = {"출석", "지각", "결석", "조퇴", "공결"};
+
     //실제 엑셀 워크북 생성 및 파일 저장 (백그라운드 스레드에서 실행됨)
     private void generateExcelFile(java.io.File file, java.time.LocalDate start, java.time.LocalDate end,
                                     java.util.List<Class_Info> selectedClasses) throws Exception {
@@ -440,48 +443,78 @@ public class ExcelExportPanel extends JPanel {
             headerFont.setBold(true); //글씨 굵게
             headerStyle.setFont(headerFont);
             headerStyle.setFillForegroundColor( new org.apache.poi.xssf.usermodel.XSSFColor(
-                    new byte[]{(byte)37, (byte)99, (byte)235}, null)); //색깔 RGB( , , )로 지정(파란색) 
+                    new byte[]{(byte)37, (byte)99, (byte)235}, null)); //색깔 RGB( , , )로 지정(파란색)
             headerStyle.setFillPattern( //채우기
                 org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
             headerFont.setColor(org.apache.poi.ss.usermodel.IndexedColors.WHITE.getIndex());
             headerStyle.setAlignment(
                 org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
 
-            // 반별 시트 생성
-            for (Class_Info cls : selectedClasses) { //선택된 반별로 시트 생성
-                org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet(cls.getClass_Name()); //반 이름으로 시트 생성
-                org.apache.poi.ss.usermodel.Drawing<?> drawing = sheet.createDrawingPatriarch(); //사유 메모(코멘트)를 달기 위한 드로잉 영역
-                org.apache.poi.ss.usermodel.CreationHelper helper = workbook.getCreationHelper();
+            // 반 구분 라벨 스타일 (반별로 시트를 나누지 않는 대신 이 행으로 반을 구분)
+            org.apache.poi.ss.usermodel.CellStyle classLabelStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font classLabelFont = workbook.createFont();
+            classLabelFont.setBold(true);
+            classLabelStyle.setFont(classLabelFont);
+            classLabelStyle.setFillForegroundColor(new org.apache.poi.xssf.usermodel.XSSFColor(
+                    new byte[]{(byte)229, (byte)231, (byte)235}, null)); //연한 회색
+            classLabelStyle.setFillPattern(
+                org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
 
-                // 헤더 행 — 이름 + 날짜들 + 통계
-                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0); //헤더 행 생성
-                int col = 0;
-                headerRow.createCell(col++).setCellValue("이름");//헤더에 이름 추가
+            // 모든 반이 한 시트에 표시됨
+            org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet("출석부");
+            org.apache.poi.ss.usermodel.Drawing<?> drawing = sheet.createDrawingPatriarch(); //사유 메모(코멘트)를 달기 위한 드로잉 영역
+            org.apache.poi.ss.usermodel.CreationHelper helper = workbook.getCreationHelper();
 
-                java.util.List<java.time.LocalDate> dates = new java.util.ArrayList<>(); //헤더에 날짜들 추가
-                java.time.LocalDate d = start;
-                while (!d.isAfter(end)) {
-                    dates.add(d);
-                    org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(col++);
-                    cell.setCellValue(d.toString());
-                    cell.setCellStyle(headerStyle);
-                    d = d.plusDays(1);
+            java.util.List<java.time.LocalDate> dates = new java.util.ArrayList<>();
+            java.time.LocalDate d = start;
+            while (!d.isAfter(end)) {
+                dates.add(d);
+                d = d.plusDays(1);
+            }
+
+            // 헤더 행 — 이름 + 통계(맨 앞으로 이동) + 날짜들
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            int col = 0;
+            org.apache.poi.ss.usermodel.Cell nameHeaderCell = headerRow.createCell(col++);
+            nameHeaderCell.setCellValue("이름");
+            nameHeaderCell.setCellStyle(headerStyle);
+
+            for (String stat : STAT_LABELS) { //통계 헤더를 이름 바로 뒤, 날짜들보다 앞에 배치
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(col++);
+                cell.setCellValue(stat);
+                cell.setCellStyle(headerStyle);
+            }
+            for (java.time.LocalDate date : dates) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(col++);
+                cell.setCellValue(date.toString());
+                cell.setCellStyle(headerStyle);
+            }
+            int totalCols = col;
+
+            // 이름 + 통계 5개 = 6개 열 고정, 헤더 행(1개) 고정
+            sheet.createFreezePane(1 + STAT_LABELS.length, 1);
+
+            int rowIdx = 1;
+            for (Class_Info cls : selectedClasses) { //선택된 반별로 데이터 블록 생성, 반 사이는 빈 행으로 구분
+
+                // 반 구분 라벨 행
+                org.apache.poi.ss.usermodel.Row classRow = sheet.createRow(rowIdx++);
+                for (int i = 0; i < totalCols; i++) {
+                    classRow.createCell(i).setCellStyle(classLabelStyle);
                 }
-                // 통계 헤더
-                for (String stat : new String[]{"출석", "지각", "결석", "조퇴", "공결"}) { //헤더에 각 출결 결과 추가
-                    org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(col++);
-                    cell.setCellValue(stat);
-                    cell.setCellStyle(headerStyle);
-                }
-                headerRow.getCell(0).setCellStyle(headerStyle);
+                classRow.getCell(0).setCellValue(cls.getClass_Name());
+
+                int totalPresent = 0, totalLate = 0, totalAbsent = 0, totalEarlyLeave = 0, totalExcused = 0;
 
                 // 학생별 행
-                int rowIdx = 1;
                 for (Student s : DataManager.getStudent()) {
                     if (s.getClass_Id() != cls.getClass_Id()) continue; //선택된 반의 데이터만 사용
                     org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++); //학생 정보를 위한 행을 생성
                     col = 0;
-                    row.createCell(col++).setCellValue(s.getName()); //
+                    row.createCell(col++).setCellValue(s.getName());
+
+                    int statStartCol = col;
+                    col += STAT_LABELS.length; // 통계 값은 날짜를 모두 계산한 뒤 채우므로 자리만 확보
 
                     int present = 0, late = 0, absent = 0, earlyLeave = 0, excused = 0;
                     for (java.time.LocalDate date : dates) { //통계 계산
@@ -511,62 +544,43 @@ public class ExcelExportPanel extends JPanel {
                             case "공결" -> excused++;
                         }
                     }
-                    // 통계 출력
-                    row.createCell(col++).setCellValue(present);
-                    row.createCell(col++).setCellValue(late);
-                    row.createCell(col++).setCellValue(absent);
-                    row.createCell(col++).setCellValue(earlyLeave);
-                    row.createCell(col++).setCellValue(excused);
+
+                    // 통계 값 채우기 (이름 바로 뒤 열)
+                    int sc = statStartCol;
+                    row.createCell(sc++).setCellValue(present);
+                    row.createCell(sc++).setCellValue(late);
+                    row.createCell(sc++).setCellValue(absent);
+                    row.createCell(sc++).setCellValue(earlyLeave);
+                    row.createCell(sc++).setCellValue(excused);
+
+                    totalPresent += present;
+                    totalLate += late;
+                    totalAbsent += absent;
+                    totalEarlyLeave += earlyLeave;
+                    totalExcused += excused;
                 }
 
-                // 열 너비 자동 조정
-                for (int i = 0; i < col; i++) {
-                    sheet.autoSizeColumn(i);
-                }
-                // 통계 열 5개 너비 고정 (dates.size() + 1 이후부터)
-                int statStartCol = dates.size() + 1;
-                for (int i = statStartCol; i < statStartCol + 5; i++) {
-                    sheet.setColumnWidth(i, 2500);
-                    sheet.setColumnWidth(0, 3500); // 이름 열 너비 고정
-                }
-                
-                // 빈 행 구분
-                sheet.createRow(rowIdx++);
-
-                // 반 전체 통계 헤더 행
-                org.apache.poi.ss.usermodel.Row totalHeaderRow = sheet.createRow(rowIdx++);
-                org.apache.poi.ss.usermodel.Cell totalHeaderCell = totalHeaderRow.createCell(0);
-                totalHeaderCell.setCellValue("반 전체 통계");
-                totalHeaderCell.setCellStyle(headerStyle);
-
-                // 반 전체 합산
-                int totalPresent = 0, totalLate = 0, totalAbsent = 0,
-                    totalEarlyLeave = 0, totalExcused = 0;
-
-                for (Student s : DataManager.getStudent()) { //학생별 출결 상태를 불러와 전테 통계에 합산
-                    if (s.getClass_Id() != cls.getClass_Id()) continue;
-                    for (java.time.LocalDate date : dates) {
-                        String status = getStatusStr(s.getStudent_id(), date);
-                        switch (status) {
-                            case "출석" -> totalPresent++;
-                            case "지각" -> totalLate++;
-                            case "결석" -> totalAbsent++;
-                            case "조퇴" -> totalEarlyLeave++;
-                            case "공결" -> totalExcused++;
-                        }
-                    }
-                }
-
-                // 반 전체 통계 데이터 행
+                // 반 전체 합계 행
                 org.apache.poi.ss.usermodel.Row totalRow = sheet.createRow(rowIdx++);
                 totalRow.createCell(0).setCellValue("합계");
-                int statCol = dates.size() + 1;
-                //통계 추가
-                totalRow.createCell(statCol++).setCellValue(totalPresent); 
-                totalRow.createCell(statCol++).setCellValue(totalLate);
-                totalRow.createCell(statCol++).setCellValue(totalAbsent);
-                totalRow.createCell(statCol++).setCellValue(totalEarlyLeave);
-                totalRow.createCell(statCol++).setCellValue(totalExcused);
+                int sc = 1;
+                totalRow.createCell(sc++).setCellValue(totalPresent);
+                totalRow.createCell(sc++).setCellValue(totalLate);
+                totalRow.createCell(sc++).setCellValue(totalAbsent);
+                totalRow.createCell(sc++).setCellValue(totalEarlyLeave);
+                totalRow.createCell(sc++).setCellValue(totalExcused);
+
+                // 다음 반과 구분하기 위한 빈 행
+                rowIdx++;
+            }
+
+            // 열 너비 자동 조정
+            for (int i = 0; i < totalCols; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            sheet.setColumnWidth(0, 3500); // 이름 열 너비 고정
+            for (int i = 1; i <= STAT_LABELS.length; i++) {
+                sheet.setColumnWidth(i, 2500); // 통계 열 너비 고정
             }
 
             // 파일 저장
