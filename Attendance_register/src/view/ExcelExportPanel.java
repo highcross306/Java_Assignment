@@ -481,8 +481,11 @@ public class ExcelExportPanel extends JPanel {
                 d = d.plusDays(1);
             }
 
+            // 표 시작 위치를 4행 아래로 내림
+            int tableStartRow = 4;
+
             // 헤더 행 — 이름 + 통계(맨 앞으로 이동) + 날짜들
-            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(tableStartRow);
             int col = 0;
             org.apache.poi.ss.usermodel.Cell nameHeaderCell = headerRow.createCell(col++);
             nameHeaderCell.setCellValue("이름");
@@ -500,10 +503,10 @@ public class ExcelExportPanel extends JPanel {
             }
             int totalCols = col;
 
-            // 이름 + 통계 5개 = 6개 열 고정, 헤더 행(1개) 고정
-            sheet.createFreezePane(1 + STAT_LABELS.length, 1);
+            // 이름 + 통계 5개 = 6개 열 고정, 헤더 행까지 고정
+            sheet.createFreezePane(1 + STAT_LABELS.length, tableStartRow + 1);
 
-            int rowIdx = 1;
+            int rowIdx = tableStartRow + 1;
             for (Class_Info cls : selectedClasses) { //선택된 반별로 데이터 블록 생성, 반 사이는 빈 행으로 구분
 
                 // 반 구분 라벨 행 (이름 열에만 반 이름 표시, 나머지는 비워둠)
