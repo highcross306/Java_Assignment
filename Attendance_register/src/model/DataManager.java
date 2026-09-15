@@ -89,6 +89,20 @@ public class DataManager {
         }
     }
 
+    // 로그아웃: 토큰과 함께, 화면에 남아있던 이전 사용자의 데이터도 전부 비움
+    // (비우지 않으면 다음 사용자가 로그인했을 때 로딩 전까지 이전 사용자 데이터가 잠깐 보일 수 있음)
+    public static void logout() {
+        authToken = null;
+        currentUsername = null;
+        students.clear();
+        classes.clear();
+        records.clear();
+        studentMap.clear();
+        classMap.clear();
+        knownClassIds.clear();
+        knownStudentIds.clear();
+    }
+
     // =====================================================
     // 프로그램 시작 시 호출, 서버에서 전체 데이터 불러오기
     // =====================================================

@@ -3,6 +3,7 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import main.Main;
 import model.DataManager;
 
 public class MainFrame extends JFrame{
@@ -71,12 +72,19 @@ public class MainFrame extends JFrame{
 		return sidebar;
 	}
 	
-	//새로고침 버튼 생성 (서버에서 최신 데이터를 다시 불러와 현재 화면 갱신)
+	//새로고침 버튼 + 로그인 사용자 표시 + 로그아웃 버튼 생성
 	private JPanel buildRefreshButton() {
-		JPanel panel = new JPanel(new BorderLayout());
+		JPanel panel = new JPanel();
+		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 		panel.setBackground(WHITE);
 		panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 12, 12));
-		
+
+		JLabel userLabel = new JLabel(DataManager.getCurrentUsername() + "님", SwingConstants.CENTER);
+		userLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		userLabel.setForeground(GRAY_TXT);
+		userLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		userLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+
 		JButton refreshBtn = new JButton("⟳ 새로고침");
 		refreshBtn.setFont(new Font("맑은 고딕", Font.BOLD, 13));
 		refreshBtn.setForeground(WHITE);
@@ -85,12 +93,40 @@ public class MainFrame extends JFrame{
 		refreshBtn.setBorderPainted(false);
 		refreshBtn.setOpaque(true);
 		refreshBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		refreshBtn.setPreferredSize(new Dimension(0, 40));
-		
+		refreshBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		refreshBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+
 		refreshBtn.addActionListener(e -> refreshCurrentPanel()); //클릭 시 현재 화면 새로고침
-		
-		panel.add(refreshBtn, BorderLayout.CENTER);
+
+		JButton logoutBtn = new JButton("로그아웃");
+		logoutBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		logoutBtn.setForeground(GRAY_TXT);
+		logoutBtn.setBackground(WHITE);
+		logoutBtn.setFocusPainted(false);
+		logoutBtn.setBorderPainted(false);
+		logoutBtn.setOpaque(true);
+		logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		logoutBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		logoutBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		logoutBtn.addActionListener(e -> logout());
+
+		panel.add(userLabel);
+		panel.add(refreshBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 4)));
+		panel.add(logoutBtn);
 		return panel;
+	}
+
+	//로그아웃: 확인 후 변경사항을 저장하고, 이 창을 닫은 뒤 로그인 화면부터 다시 시작
+	private void logout() {
+		int choice = JOptionPane.showConfirmDialog(
+				this, "로그아웃하시겠습니까?", "로그아웃", JOptionPane.YES_NO_OPTION);
+		if (choice != JOptionPane.YES_OPTION) return;
+
+		DataManager.saveAll(); // 나가기 전에 변경사항 저장
+		DataManager.logout();
+		dispose();
+		SwingUtilities.invokeLater(Main::startSession);
 	}
 	
 	//현재 보고 있는 화면을 서버 최신 데이터로 갱신
