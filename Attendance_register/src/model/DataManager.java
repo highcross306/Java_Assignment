@@ -38,6 +38,58 @@ public class DataManager {
     private static Set<Integer> knownStudentIds = new HashSet<>();
 
     // =====================================================
+    // 로그인 관련
+    // 서버가 회원가입/로그인 시스템을 갖추면서, 이제 모든 API 호출에는
+    // 로그인 시 발급받은 토큰을 Authorization 헤더로 실어 보내야 함
+    // =====================================================
+    private static String authToken = null;
+    private static String currentUsername = null;
+
+    public static boolean isLoggedIn() { return authToken != null; }
+    public static String getCurrentUsername() { return currentUsername; }
+
+    // 회원가입: 성공하면 바로 로그인된 상태가 됨 (서버가 가입과 동시에 토큰을 내려줌)
+    public static String signup(String username, String password) {
+        return authenticate("/auth/signup", username, password);
+    }
+
+    public static String login(String username, String password) {
+        return authenticate("/auth/login", username, password);
+    }
+
+    // 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지를 반환
+    private static String authenticate(String path, String username, String password) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("username", username);
+            json.put("password", password);
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(SERVER_URL + path))
+                    .header("Content-Type", "application/json; charset=UTF-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(json.toString(), StandardCharsets.UTF_8))
+                    .build();
+            HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+            if (res.statusCode() == 200 || res.statusCode() == 201) {
+                JSONObject body = new JSONObject(res.body());
+                authToken = body.getString("token");
+                currentUsername = body.getString("username");
+                return null;
+            }
+
+            try {
+                JSONObject err = new JSONObject(res.body());
+                return err.optString("message", "요청이 실패했습니다 (코드 " + res.statusCode() + ")");
+            } catch (Exception parseError) {
+                return "요청이 실패했습니다 (코드 " + res.statusCode() + ")";
+            }
+        } catch (Exception e) {
+            return "서버에 연결할 수 없습니다: " + e.getMessage();
+        }
+    }
+
+    // =====================================================
     // 프로그램 시작 시 호출, 서버에서 전체 데이터 불러오기
     // =====================================================
     public static void loadAll() {
@@ -58,18 +110,23 @@ public class DataManager {
     // 공통 HTTP 헬퍼 메서드
     // (GET/POST/PUT/DELETE를 매번 똑같이 반복 작성하지 않도록 정리한 것)
     // =====================================================
+    // 로그인 토큰이 있으면 Authorization 헤더를 자동으로 붙여주는 공통 요청 빌더
+    private static HttpRequest.Builder authorizedBuilder(String path) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(SERVER_URL + path));
+        if (authToken != null) {
+            builder.header("Authorization", "Bearer " + authToken);
+        }
+        return builder;
+    }
+
     private static String httpGet(String path) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(SERVER_URL + path))
-                .GET()
-                .build();
+        HttpRequest req = authorizedBuilder(path).GET().build();
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         return res.body();
     }
 
     private static String httpPost(String path, String jsonBody) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(SERVER_URL + path))
+        HttpRequest req = authorizedBuilder(path)
                 .header("Content-Type", "application/json; charset=UTF-8")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
@@ -78,8 +135,7 @@ public class DataManager {
     }
 
     private static void httpPut(String path, String jsonBody) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(SERVER_URL + path))
+        HttpRequest req = authorizedBuilder(path)
                 .header("Content-Type", "application/json; charset=UTF-8")
                 .PUT(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
@@ -87,10 +143,7 @@ public class DataManager {
     }
 
     private static void httpDelete(String path) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(SERVER_URL + path))
-                .DELETE()
-                .build();
+        HttpRequest req = authorizedBuilder(path).DELETE().build();
         client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
