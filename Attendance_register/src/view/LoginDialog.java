@@ -19,7 +19,7 @@ public class LoginDialog extends JDialog {
 
     private final JTextField serverUrlField = new JTextField(16);
     private final JTextField usernameField = new JTextField(16);
-    private final JPasswordField passwordField = new JPasswordField(16);
+    private final JPasswordField passwordField = new PlaceholderPasswordField(16, "비밀번호는 8자 이상이어야 합니다");
     private final JCheckBox rememberCheckBox = new JCheckBox("내 정보 기억");
     private final JLabel messageLabel = new JLabel(" ");
 
@@ -233,5 +233,35 @@ public class LoginDialog extends JDialog {
         }
         String host = lower.substring("http://".length());
         return !(host.startsWith("localhost") || host.startsWith("127.0.0.1"));
+    }
+
+    // JPasswordField는 HTML input의 placeholder 같은 기능이 없어서, 비어있고
+    // 포커스가 없을 때만 안내 문구를 회색으로 겹쳐 그려주는 방식으로 흉내냄
+    private static class PlaceholderPasswordField extends JPasswordField {
+        private static final long serialVersionUID = 1L;
+        private final String placeholder;
+
+        PlaceholderPasswordField(int columns, String placeholder) {
+            super(columns);
+            this.placeholder = placeholder;
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (getPassword().length != 0) {
+                return;
+            }
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Color.GRAY);
+            g2.setFont(getFont());
+            Insets insets = getInsets();
+            FontMetrics fm = g2.getFontMetrics();
+            int x = insets.left + 2;
+            int y = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+            g2.drawString(placeholder, x, y);
+            g2.dispose();
+        }
     }
 }
