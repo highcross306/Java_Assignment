@@ -2,6 +2,8 @@ package view;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
 import model.DataManager;
 
 // 프로그램 시작 시 뜨는 로그인/회원가입 창.
@@ -102,18 +104,22 @@ public class LoginDialog extends JDialog {
         setLocationRelativeTo(owner);
     }
 
-    // 비밀번호 입력칸 오른쪽에 "보기"/"숨기기" 토글 버튼을 붙인 한 줄짜리 패널을 만듦.
-    // 기본은 별표(echo char)로 가려져 있고, 버튼을 누르면 그 동안만 평문으로 보여줌
+    // 비밀번호 입력칸 오른쪽에 눈 모양 아이콘 토글 버튼을 붙인 한 줄짜리 패널을 만듦.
+    // 기본은 별표(echo char)로 가려져 있고(감은 눈), 누르면 그 동안만 평문으로 보여줌(뜬 눈)
     private JPanel passwordFieldWithToggle() {
         char defaultEchoChar = passwordField.getEchoChar();
-        JButton toggleBtn = new JButton("보기");
-        toggleBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+        JButton toggleBtn = new JButton(new EyeIcon(false));
+        toggleBtn.setToolTipText("비밀번호 보기");
+        toggleBtn.setBorderPainted(false);
+        toggleBtn.setContentAreaFilled(false);
         toggleBtn.setFocusPainted(false);
-        toggleBtn.setPreferredSize(new Dimension(52, 28));
+        toggleBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        toggleBtn.setPreferredSize(new Dimension(28, 28));
         toggleBtn.addActionListener(e -> {
-            boolean isCurrentlyHidden = passwordField.getEchoChar() != 0;
-            passwordField.setEchoChar(isCurrentlyHidden ? (char) 0 : defaultEchoChar);
-            toggleBtn.setText(isCurrentlyHidden ? "숨기기" : "보기");
+            boolean willBeVisible = passwordField.getEchoChar() != 0;
+            passwordField.setEchoChar(willBeVisible ? (char) 0 : defaultEchoChar);
+            toggleBtn.setIcon(new EyeIcon(willBeVisible));
+            toggleBtn.setToolTipText(willBeVisible ? "비밀번호 숨기기" : "비밀번호 보기");
         });
 
         JPanel row = new JPanel(new BorderLayout(6, 0));
@@ -262,6 +268,47 @@ public class LoginDialog extends JDialog {
             int y = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
             g2.drawString(placeholder, x, y);
             g2.dispose();
+        }
+    }
+
+    // 버튼에 쓸 눈 모양 아이콘을 직접 그려서 씀 (이미지 리소스 없이 처리).
+    // visible=true면 눈동자가 있는 "뜬 눈", false면 사선이 그어진 "감은 눈"
+    private static class EyeIcon implements Icon {
+        private static final int SIZE = 18;
+        private final boolean visible;
+
+        EyeIcon(boolean visible) {
+            this.visible = visible;
+        }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.translate(x, y);
+            g2.setColor(GRAY_TXT);
+            g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+            // 눈 윤곽(아몬드형)
+            g2.draw(new Ellipse2D.Double(1, 4, SIZE - 2, SIZE - 8));
+
+            if (visible) {
+                int pupil = 5;
+                g2.fillOval(SIZE / 2 - pupil / 2, SIZE / 2 - pupil / 2, pupil, pupil);
+            } else {
+                g2.draw(new Line2D.Double(1, SIZE - 3, SIZE - 1, 3));
+            }
+            g2.dispose();
+        }
+
+        @Override
+        public int getIconWidth() {
+            return SIZE;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return SIZE;
         }
     }
 }
