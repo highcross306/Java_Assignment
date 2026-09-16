@@ -176,6 +176,13 @@ public class LoginDialog extends JDialog {
             messageLabel.setText("아이디와 비밀번호를 입력해주세요");
             return;
         }
+        // 서버(AuthRequest)도 비밀번호 8자 이상을 요구하므로, 여기서 먼저 걸러서
+        // 서버가 돌려주는 영문 검증 메시지 대신 친절한 한글 메시지를 바로 보여줌
+        if (password.length() < 8) {
+            messageLabel.setForeground(RED);
+            messageLabel.setText("비밀번호는 8자 이상이어야 합니다");
+            return;
+        }
 
         if (isInsecureNonLocalUrl(serverUrl)) {
             int choice = JOptionPane.showConfirmDialog(this,
