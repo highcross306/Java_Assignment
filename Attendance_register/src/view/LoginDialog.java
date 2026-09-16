@@ -134,6 +134,17 @@ public class LoginDialog extends JDialog {
             return;
         }
 
+        if (isInsecureNonLocalUrl(serverUrl)) {
+            int choice = JOptionPane.showConfirmDialog(this,
+                    "암호화되지 않은 연결(http://)입니다. 로그인 정보와 학생 개인정보가\n" +
+                            "전송 구간에서 노출될 수 있습니다. 학원 서버 주소가 https://로\n" +
+                            "시작하는지 다시 확인하는 것을 권장합니다.\n\n그래도 계속 진행하시겠습니까?",
+                    "보안 경고", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+
         // 서버 주소가 바뀌었을 수도 있으니 매 시도마다 최신 입력값으로 저장함
         DataManager.setServerUrl(serverUrl);
 
@@ -160,5 +171,16 @@ public class LoginDialog extends JDialog {
 
     public boolean isSuccess() {
         return success;
+    }
+
+    // 로컬 개발 서버(localhost/127.0.0.1)는 예외적으로 허용하고, 그 외의
+    // http:// 주소만 경고 대상으로 삼음
+    private boolean isInsecureNonLocalUrl(String input) {
+        String lower = input.trim().toLowerCase();
+        if (!lower.startsWith("http://")) {
+            return false;
+        }
+        String host = lower.substring("http://".length());
+        return !(host.startsWith("localhost") || host.startsWith("127.0.0.1"));
     }
 }
