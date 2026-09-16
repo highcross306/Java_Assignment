@@ -14,6 +14,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.SecureRandom;
+
 public class DataManager {
 
     // ====== 서버 주소 ======
@@ -42,8 +49,11 @@ public class DataManager {
     // ====== 아이디/비밀번호 기억하기 ======
     // "내 정보 기억" 체크 시에만 저장함. 자동으로 로그인까지 하지는 않고
     // 화면에 미리 채워주기만 해서, 로그인 버튼은 항상 사용자가 직접 눌러야 함.
-    // 비밀번호는 암호화 없이 그대로 저장되므로(이 PC의 사용자 설정/레지스트리),
-    // 여러 사람이 함께 쓰는 PC에서는 체크하지 않는 것을 권장함.
+    // 비밀번호는 이 PC에서만 쓰는 키로 암호화해서 저장하므로(아래 encrypt/decrypt),
+    // 레지스트리를 직접 열어봐도 평문 그대로 보이지 않음. 다만 그 키도 같은 PC의
+    // 사용자 설정에 함께 보관되므로, 이 PC 자체에 대한 접근 권한이 있는 사람에게는
+    // 여전히 복호화가 가능한 수준의 보호임 — 여러 사람이 함께 쓰는 PC에서는 체크하지
+    // 않는 것을 권장함.
     public static boolean isRememberMeEnabled() {
         return prefs.getBoolean("remember_me", false);
     }
@@ -53,17 +63,68 @@ public class DataManager {
     }
 
     public static String getSavedPassword() {
-        return prefs.get("saved_password", null);
+        String encrypted = prefs.get("saved_password", null);
+        return encrypted == null ? null : decrypt(encrypted);
     }
 
     public static void saveRememberedCredentials(boolean remember, String username, String password) {
         prefs.putBoolean("remember_me", remember);
         if (remember) {
             prefs.put("saved_username", username);
-            prefs.put("saved_password", password);
+            prefs.put("saved_password", encrypt(password));
         } else {
             prefs.remove("saved_username");
             prefs.remove("saved_password");
+        }
+    }
+
+    // ---- 저장된 비밀번호를 평문으로 남기지 않기 위한 최소한의 암복호화 ----
+    private static final SecureRandom secureRandom = new SecureRandom();
+
+    private static SecretKey getOrCreateLocalKey() {
+        String base64Key = prefs.get("cred_key", null);
+        if (base64Key == null) {
+            try {
+                KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+                keyGen.init(128);
+                base64Key = Base64.getEncoder().encodeToString(keyGen.generateKey().getEncoded());
+                prefs.put("cred_key", base64Key);
+            } catch (Exception e) {
+                throw new RuntimeException("암호화 키 생성 실패", e);
+            }
+        }
+        return new SecretKeySpec(Base64.getDecoder().decode(base64Key), "AES");
+    }
+
+    private static String encrypt(String plainText) {
+        try {
+            byte[] iv = new byte[12];
+            secureRandom.nextBytes(iv);
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateLocalKey(), new GCMParameterSpec(128, iv));
+            byte[] cipherText = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+
+            byte[] combined = new byte[iv.length + cipherText.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(cipherText, 0, combined, iv.length, cipherText.length);
+            return Base64.getEncoder().encodeToString(combined);
+        } catch (Exception e) {
+            throw new RuntimeException("비밀번호 암호화 실패", e);
+        }
+    }
+
+    private static String decrypt(String base64Combined) {
+        try {
+            byte[] combined = Base64.getDecoder().decode(base64Combined);
+            byte[] iv = Arrays.copyOfRange(combined, 0, 12);
+            byte[] cipherText = Arrays.copyOfRange(combined, 12, combined.length);
+
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, getOrCreateLocalKey(), new GCMParameterSpec(128, iv));
+            return new String(cipher.doFinal(cipherText), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            // 키가 바뀌었거나 값이 손상된 경우 등: 그냥 저장된 적 없는 것처럼 처리
+            return null;
         }
     }
 
