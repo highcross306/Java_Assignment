@@ -8,6 +8,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.prefs.Preferences;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -16,10 +17,27 @@ import com.google.gson.JsonParser;
 public class DataManager {
 
     // ====== 서버 주소 ======
-    // 같은 PC에서 서버까지 실행 중이면 localhost로 충분함.
-    // 만약 다른 컴퓨터(서버용 PC)에서 서버를 돌린다면, 이 부분을 그 PC의 IP로 바꿔야 함
-    // 예: "http://192.168.0.15:8080/api"
-    private static final String SERVER_URL = "http://localhost:9090/api";
+    // 학원마다 각자 자기 서버를 운영하므로 주소를 코드에 고정하지 않고, 로그인 화면에서
+    // 입력받아 이 PC의 사용자 설정(레지스트리/Preferences)에 저장해두고 재사용함
+    private static final Preferences prefs = Preferences.userNodeForPackage(DataManager.class);
+    private static String serverUrl = prefs.get("server_url", null);
+
+    public static boolean isServerConfigured() { return serverUrl != null; }
+    public static String getServerUrl() { return serverUrl; }
+
+    // 사용자가 "myacademy.onrender.com" 처럼 호스트 주소만 입력해도
+    // 뒤에 서버의 공통 API 경로(/api)를 자동으로 붙여서 저장함
+    public static void setServerUrl(String rawInput) {
+        String trimmed = rawInput.trim();
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        String withScheme = (trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+                ? trimmed
+                : "https://" + trimmed;
+        serverUrl = withScheme + "/api";
+        prefs.put("server_url", serverUrl);
+    }
 
     // HttpClient는 한 번만 만들어서 계속 재사용하는 게 정석 (매번 새로 만들면 비효율적)
     private static final HttpClient client = HttpClient.newHttpClient();
@@ -66,7 +84,7 @@ public class DataManager {
             json.addProperty("password", password);
 
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(SERVER_URL + path))
+                    .uri(URI.create(serverUrl + path))
                     .header("Content-Type", "application/json; charset=UTF-8")
                     .POST(HttpRequest.BodyPublishers.ofString(json.toString(), StandardCharsets.UTF_8))
                     .build();
@@ -139,7 +157,7 @@ public class DataManager {
     // =====================================================
     // 로그인 토큰이 있으면 Authorization 헤더를 자동으로 붙여주는 공통 요청 빌더
     private static HttpRequest.Builder authorizedBuilder(String path) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(SERVER_URL + path));
+        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(serverUrl + path));
         if (authToken != null) {
             builder.header("Authorization", "Bearer " + authToken);
         }
