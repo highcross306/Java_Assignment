@@ -52,7 +52,7 @@ public class LoginDialog extends JDialog {
         form.add(Box.createRigidArea(new Dimension(0, 10)));
         form.add(labeled("아이디", usernameField));
         form.add(Box.createRigidArea(new Dimension(0, 10)));
-        form.add(labeled("비밀번호", passwordField));
+        form.add(labeled("비밀번호", passwordFieldWithToggle()));
 
         // 이전에 "내 정보 기억"을 체크하고 로그인/회원가입에 성공한 적이 있으면
         // 아이디/비밀번호를 미리 채워줌 (로그인은 여전히 직접 눌러야 함)
@@ -100,6 +100,27 @@ public class LoginDialog extends JDialog {
         setContentPane(content);
         pack();
         setLocationRelativeTo(owner);
+    }
+
+    // 비밀번호 입력칸 오른쪽에 "보기"/"숨기기" 토글 버튼을 붙인 한 줄짜리 패널을 만듦.
+    // 기본은 별표(echo char)로 가려져 있고, 버튼을 누르면 그 동안만 평문으로 보여줌
+    private JPanel passwordFieldWithToggle() {
+        char defaultEchoChar = passwordField.getEchoChar();
+        JButton toggleBtn = new JButton("보기");
+        toggleBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+        toggleBtn.setFocusPainted(false);
+        toggleBtn.setPreferredSize(new Dimension(52, 28));
+        toggleBtn.addActionListener(e -> {
+            boolean isCurrentlyHidden = passwordField.getEchoChar() != 0;
+            passwordField.setEchoChar(isCurrentlyHidden ? (char) 0 : defaultEchoChar);
+            toggleBtn.setText(isCurrentlyHidden ? "숨기기" : "보기");
+        });
+
+        JPanel row = new JPanel(new BorderLayout(6, 0));
+        row.setOpaque(false);
+        row.add(passwordField, BorderLayout.CENTER);
+        row.add(toggleBtn, BorderLayout.EAST);
+        return row;
     }
 
     private JPanel labeled(String label, JComponent field) {
