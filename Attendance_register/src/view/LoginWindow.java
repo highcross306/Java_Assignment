@@ -7,8 +7,11 @@ import java.awt.geom.Line2D;
 import model.DataManager;
 
 // 프로그램 시작 시 뜨는 로그인/회원가입 창.
-// 로그인(또는 회원가입)에 성공해야만 닫히고, 그 이후에 MainFrame이 뜸
-public class LoginDialog extends JDialog {
+// JDialog가 아니라 JFrame으로 만든 이유: JDialog는 윈도우 작업표시줄에 독립된
+// 항목으로 뜨지 않아서, 다른 창들에 가려지면 최소화하지 않는 이상 찾기 어려웠음.
+// 로그인 성공 시 onLoginSuccess 콜백을 실행하고 이 창은 닫힘(모달로 막아두는
+// 대신 콜백으로 이어감)
+public class LoginWindow extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
@@ -17,7 +20,7 @@ public class LoginDialog extends JDialog {
     private static final Color RED = new Color(220, 38, 38);
     private static final Color GRAY_TXT = new Color(107, 114, 128);
 
-    private boolean success = false;
+    private final Runnable onLoginSuccess;
 
     private final JTextField serverUrlField = new JTextField(16);
     private final JTextField usernameField = new JTextField(16);
@@ -25,10 +28,12 @@ public class LoginDialog extends JDialog {
     private final JCheckBox rememberCheckBox = new JCheckBox("내 정보 기억");
     private final JLabel messageLabel = new JLabel(" ");
 
-    public LoginDialog(Frame owner) {
-        super(owner, "학원 출석 관리 프로그램 - 로그인", true);
+    public LoginWindow(Runnable onLoginSuccess) {
+        super("학원 출석 관리 프로그램 - 로그인");
+        this.onLoginSuccess = onLoginSuccess;
         setResizable(false);
-        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        // 로그인하지 않고 창을 닫으면(작업표시줄 우클릭 닫기 포함) 프로그램 자체를 종료
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         JPanel content = new JPanel();
         content.setBackground(BG);
@@ -101,7 +106,7 @@ public class LoginDialog extends JDialog {
 
         setContentPane(content);
         pack();
-        setLocationRelativeTo(owner);
+        setLocationRelativeTo(null); // 소유 창이 없으니 화면 가운데에 띄움
     }
 
     // 비밀번호 입력칸 오른쪽에 눈 모양 아이콘 토글 버튼을 붙인 한 줄짜리 패널을 만듦.
@@ -216,18 +221,14 @@ public class LoginDialog extends JDialog {
             SwingUtilities.invokeLater(() -> {
                 if (error == null) {
                     DataManager.saveRememberedCredentials(rememberCheckBox.isSelected(), username, password);
-                    success = true;
                     dispose();
+                    onLoginSuccess.run();
                 } else {
                     messageLabel.setForeground(RED);
                     messageLabel.setText(error);
                 }
             });
         }).start();
-    }
-
-    public boolean isSuccess() {
-        return success;
     }
 
     // 로컬 개발 서버(localhost/127.0.0.1)는 예외적으로 허용하고, 그 외의
