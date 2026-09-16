@@ -9,8 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 public class DataManager {
 
@@ -60,9 +61,9 @@ public class DataManager {
     // 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지를 반환
     private static String authenticate(String path, String username, String password) {
         try {
-            JSONObject json = new JSONObject();
-            json.put("username", username);
-            json.put("password", password);
+            JsonObject json = new JsonObject();
+            json.addProperty("username", username);
+            json.addProperty("password", password);
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(SERVER_URL + path))
@@ -72,20 +73,32 @@ public class DataManager {
             HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
             if (res.statusCode() == 200 || res.statusCode() == 201) {
-                JSONObject body = new JSONObject(res.body());
-                authToken = body.getString("token");
-                currentUsername = body.getString("username");
+                JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+                authToken = body.get("token").getAsString();
+                currentUsername = body.get("username").getAsString();
                 return null;
             }
 
             try {
-                JSONObject err = new JSONObject(res.body());
-                return err.optString("message", "요청이 실패했습니다 (코드 " + res.statusCode() + ")");
+                JsonObject err = JsonParser.parseString(res.body()).getAsJsonObject();
+                return optString(err, "message", "요청이 실패했습니다 (코드 " + res.statusCode() + ")");
             } catch (Exception parseError) {
                 return "요청이 실패했습니다 (코드 " + res.statusCode() + ")";
             }
         } catch (Exception e) {
             return "서버에 연결할 수 없습니다: " + e.getMessage();
+        }
+    }
+
+    // org.json의 optString(key, default)과 동일하게 동작: 키가 없거나 null이면 기본값 반환
+    private static String optString(JsonObject obj, String key, String def) {
+        return (obj.has(key) && !obj.get(key).isJsonNull()) ? obj.get(key).getAsString() : def;
+    }
+
+    // org.json의 JSONObject.put(key, value)와 동일하게 동작: value가 null이면 키 자체를 넣지 않음
+    private static void putNullable(JsonObject json, String key, String value) {
+        if (value != null) {
+            json.addProperty(key, value);
         }
     }
 
@@ -170,10 +183,10 @@ public class DataManager {
         knownClassIds.clear();
         try {
             String body = httpGet("/classes");
-            JSONArray arr = new JSONArray(body);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.getJSONObject(i);
-                Class_Info cls = new Class_Info(obj.getInt("classId"), obj.getString("className"));
+            JsonArray arr = JsonParser.parseString(body).getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                JsonObject obj = arr.get(i).getAsJsonObject();
+                Class_Info cls = new Class_Info(obj.get("classId").getAsInt(), obj.get("className").getAsString());
                 classes.add(cls);
                 classMap.put(cls.getClass_Id(), cls);
                 knownClassIds.add(cls.getClass_Id());
@@ -187,8 +200,8 @@ public class DataManager {
         // 1) 로컬에 있는 항목들을 서버로 반영 (새 항목은 등록, 기존 항목은 수정)
         for (Class_Info cls : classes) {
             try {
-                JSONObject json = new JSONObject();
-                json.put("className", cls.getClass_Name());
+                JsonObject json = new JsonObject();
+                json.addProperty("className", cls.getClass_Name());
 
                 if (knownClassIds.contains(cls.getClass_Id())) {
                     // 이미 서버에 있는 반 -> 수정(PUT)
@@ -196,8 +209,8 @@ public class DataManager {
                 } else {
                     // 서버에 아직 없는 반 -> 등록(POST)
                     String resBody = httpPost("/classes", json.toString());
-                    JSONObject created = new JSONObject(resBody);
-                    int serverId = created.getInt("classId");
+                    JsonObject created = JsonParser.parseString(resBody).getAsJsonObject();
+                    int serverId = created.get("classId").getAsInt();
 
                     // 서버가 실제로 발급한 id로, 로컬 객체의 id를 맞춰줌
                     // (로컬에서 임시로 매겼던 id와 서버 id가 다를 수 있기 때문)
@@ -236,17 +249,17 @@ public class DataManager {
         knownStudentIds.clear();
         try {
             String body = httpGet("/students");
-            JSONArray arr = new JSONArray(body);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.getJSONObject(i);
+            JsonArray arr = JsonParser.parseString(body).getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                JsonObject obj = arr.get(i).getAsJsonObject();
                 Student s = new Student(
-                        obj.getString("name"),
-                        obj.optString("school", ""),
-                        obj.getInt("classId")
+                        obj.get("name").getAsString(),
+                        optString(obj, "school", ""),
+                        obj.get("classId").getAsInt()
                 );
-                s.setStudent_Id(obj.getInt("studentId"));
-                s.setStudent_Phone(obj.optString("studentPhone", ""));
-                s.setGuardian_Phone(obj.optString("guardianPhone", ""));
+                s.setStudent_Id(obj.get("studentId").getAsInt());
+                s.setStudent_Phone(optString(obj, "studentPhone", ""));
+                s.setGuardian_Phone(optString(obj, "guardianPhone", ""));
                 students.add(s);
                 studentMap.put(s.getStudent_id(), s);
                 knownStudentIds.add(s.getStudent_id());
@@ -259,19 +272,19 @@ public class DataManager {
     private static void saveStudents() {
         for (Student s : students) {
             try {
-                JSONObject json = new JSONObject();
-                json.put("name", s.getName());
-                json.put("school", s.getSchool());
-                json.put("classId", s.getClass_Id());
-                json.put("studentPhone", s.getStudent_Phone());
-                json.put("guardianPhone", s.getGuardian_Phone());
+                JsonObject json = new JsonObject();
+                json.addProperty("name", s.getName());
+                putNullable(json, "school", s.getSchool());
+                json.addProperty("classId", s.getClass_Id());
+                putNullable(json, "studentPhone", s.getStudent_Phone());
+                putNullable(json, "guardianPhone", s.getGuardian_Phone());
 
                 if (knownStudentIds.contains(s.getStudent_id())) {
                     httpPut("/students/" + s.getStudent_id(), json.toString());
                 } else {
                     String resBody = httpPost("/students", json.toString());
-                    JSONObject created = new JSONObject(resBody);
-                    int serverId = created.getInt("studentId");
+                    JsonObject created = JsonParser.parseString(resBody).getAsJsonObject();
+                    int serverId = created.get("studentId").getAsInt();
 
                     studentMap.remove(s.getStudent_id());
                     s.setStudent_Id(serverId);
@@ -306,15 +319,15 @@ public class DataManager {
         records.clear();
         try {
             String body = httpGet("/attendance");
-            JSONArray arr = new JSONArray(body);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.getJSONObject(i);
+            JsonArray arr = JsonParser.parseString(body).getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                JsonObject obj = arr.get(i).getAsJsonObject();
                 records.add(new AttendanceRecord(
-                        obj.getInt("studentId"),
-                        obj.getInt("classId"),
-                        LocalDate.parse(obj.getString("date")),
-                        AttendanceStatus.valueOf(obj.getString("status")),
-                        obj.optString("reason", "")
+                        obj.get("studentId").getAsInt(),
+                        obj.get("classId").getAsInt(),
+                        LocalDate.parse(obj.get("date").getAsString()),
+                        AttendanceStatus.valueOf(obj.get("status").getAsString()),
+                        optString(obj, "reason", "")
                 ));
             }
         } catch (Exception e) {
@@ -397,10 +410,10 @@ public class DataManager {
         // 1) 서버에서 해당 조건의 기록 id 목록을 조회해서 삭제 요청
         try {
             String body = httpGet("/attendance?classId=" + classId + "&date=" + date.toString());
-            JSONArray arr = new JSONArray(body);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.getJSONObject(i);
-                int id = obj.getInt("id");
+            JsonArray arr = JsonParser.parseString(body).getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                JsonObject obj = arr.get(i).getAsJsonObject();
+                int id = obj.get("id").getAsInt();
                 httpDelete("/attendance/" + id);
             }
         } catch (Exception e) {
@@ -415,12 +428,12 @@ public class DataManager {
 
     private static void sendAttendanceToServer(AttendanceRecord r) {
         try {
-            JSONObject json = new JSONObject();
-            json.put("studentId", r.getStudent_Id());
-            json.put("classId", r.getClass_Id());
-            json.put("date", r.getDate().toString()); // "2026-06-21" 형식
-            json.put("status", r.getStatus().name());
-            json.put("reason", r.getReason() == null ? "" : r.getReason());
+            JsonObject json = new JsonObject();
+            json.addProperty("studentId", r.getStudent_Id());
+            json.addProperty("classId", r.getClass_Id());
+            json.addProperty("date", r.getDate().toString()); // "2026-06-21" 형식
+            json.addProperty("status", r.getStatus().name());
+            json.addProperty("reason", r.getReason() == null ? "" : r.getReason());
 
             httpPost("/attendance", json.toString());
         } catch (Exception e) {
