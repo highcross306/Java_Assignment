@@ -20,6 +20,7 @@ public class LoginDialog extends JDialog {
     private final JTextField serverUrlField = new JTextField(16);
     private final JTextField usernameField = new JTextField(16);
     private final JPasswordField passwordField = new JPasswordField(16);
+    private final JCheckBox rememberCheckBox = new JCheckBox("내 정보 기억");
     private final JLabel messageLabel = new JLabel(" ");
 
     public LoginDialog(Frame owner) {
@@ -52,6 +53,27 @@ public class LoginDialog extends JDialog {
         form.add(labeled("아이디", usernameField));
         form.add(Box.createRigidArea(new Dimension(0, 10)));
         form.add(labeled("비밀번호", passwordField));
+
+        // 이전에 "내 정보 기억"을 체크하고 로그인/회원가입에 성공한 적이 있으면
+        // 아이디/비밀번호를 미리 채워줌 (로그인은 여전히 직접 눌러야 함)
+        if (DataManager.isRememberMeEnabled()) {
+            rememberCheckBox.setSelected(true);
+            String savedUsername = DataManager.getSavedUsername();
+            String savedPassword = DataManager.getSavedPassword();
+            if (savedUsername != null) {
+                usernameField.setText(savedUsername);
+            }
+            if (savedPassword != null) {
+                passwordField.setText(savedPassword);
+            }
+        }
+        rememberCheckBox.setOpaque(false);
+        rememberCheckBox.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+        rememberCheckBox.setForeground(GRAY_TXT);
+        rememberCheckBox.setAlignmentX(Component.CENTER_ALIGNMENT);
+        rememberCheckBox.setFocusPainted(false);
+        form.add(Box.createRigidArea(new Dimension(0, 6)));
+        form.add(rememberCheckBox);
 
         messageLabel.setForeground(RED);
         messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -159,6 +181,7 @@ public class LoginDialog extends JDialog {
 
             SwingUtilities.invokeLater(() -> {
                 if (error == null) {
+                    DataManager.saveRememberedCredentials(rememberCheckBox.isSelected(), username, password);
                     success = true;
                     dispose();
                 } else {

@@ -39,6 +39,34 @@ public class DataManager {
         prefs.put("server_url", serverUrl);
     }
 
+    // ====== 아이디/비밀번호 기억하기 ======
+    // "내 정보 기억" 체크 시에만 저장함. 자동으로 로그인까지 하지는 않고
+    // 화면에 미리 채워주기만 해서, 로그인 버튼은 항상 사용자가 직접 눌러야 함.
+    // 비밀번호는 암호화 없이 그대로 저장되므로(이 PC의 사용자 설정/레지스트리),
+    // 여러 사람이 함께 쓰는 PC에서는 체크하지 않는 것을 권장함.
+    public static boolean isRememberMeEnabled() {
+        return prefs.getBoolean("remember_me", false);
+    }
+
+    public static String getSavedUsername() {
+        return prefs.get("saved_username", null);
+    }
+
+    public static String getSavedPassword() {
+        return prefs.get("saved_password", null);
+    }
+
+    public static void saveRememberedCredentials(boolean remember, String username, String password) {
+        prefs.putBoolean("remember_me", remember);
+        if (remember) {
+            prefs.put("saved_username", username);
+            prefs.put("saved_password", password);
+        } else {
+            prefs.remove("saved_username");
+            prefs.remove("saved_password");
+        }
+    }
+
     // HttpClient는 한 번만 만들어서 계속 재사용하는 게 정석 (매번 새로 만들면 비효율적)
     private static final HttpClient client = HttpClient.newHttpClient();
 
