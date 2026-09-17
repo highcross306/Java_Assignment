@@ -17,6 +17,7 @@ public class ClassManagePanel extends JPanel{
 	private JTable table;       // 필드로 선언 (repaint 호출에 필요)
 	private int hoverRow = -1;  // 마우스가 올라간 행
 	private int hoverBtn = -1;  // 0 = 수정, 1 = 삭제, -1 = 없음 (마우스 상태 확인용 필드)
+	private JButton addBtn;     // 데모 상태에서 반 개수 제한에 걸리면 비활성화하기 위해 필드로 보관
 	
 	//통계 자료 레이블
 	private JLabel classCountLabel; //전체 반 수
@@ -44,7 +45,7 @@ public class ClassManagePanel extends JPanel{
 		title.setForeground(new Color(17, 24, 39));
 		
 		//반생성 추가 버튼 구현
-		JButton addBtn = new JButton("+ 반 추가");
+		addBtn = new JButton("+ 반 추가");
 		addBtn.setFont(new Font("맑은 고딕", Font.BOLD, 12));
 	    addBtn.setBackground(new Color(37, 99, 235));
 	    addBtn.setForeground(Color.WHITE);
@@ -54,7 +55,15 @@ public class ClassManagePanel extends JPanel{
 	    addBtn.setFocusPainted(false);
 	    addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); //손가락 커서로 변경
 	    addBtn.setBorder(BorderFactory.createEmptyBorder(7, 14, 7, 14)); //버튼 내부 여백
-	    addBtn.addActionListener(e -> showAddDialog()); // 나중에 구현
+	    addBtn.addActionListener(e -> { //데모 상태에서 제한에 걸리면 다이얼로그 자체를 열지 않음
+	        if (isClassLimitReached()) {
+	            JOptionPane.showMessageDialog(this,
+	                "데모 상태에서는 반을 " + DataManager.getMaxClasses() + "개까지만 만들 수 있습니다.\n결제 후 이용해주세요.",
+	                "데모 제한", JOptionPane.WARNING_MESSAGE);
+	            return;
+	        }
+	        showAddDialog();
+	    });
 	    addBtn.addMouseListener(new MouseAdapter() {
 	        @Override
 	        public void mouseEntered(MouseEvent e) {
@@ -243,8 +252,26 @@ public class ClassManagePanel extends JPanel{
 		// 통계 카드 갱신
 	    if (classCountLabel != null) {
 	        classCountLabel.setText(String.valueOf(DataManager.getClasses().size()));
-	        studentCountLabel.setText(String.valueOf(DataManager.getStudent().size())); 
+	        studentCountLabel.setText(String.valueOf(DataManager.getStudent().size()));
 	    }
+
+	    updateAddButtonState();
+	}
+
+	// 데모 상태에서 이미 반 개수 제한에 도달했는지 확인
+	private boolean isClassLimitReached() {
+		return DataManager.isDemo() && DataManager.getMaxClasses() != null
+				&& DataManager.getClasses().size() >= DataManager.getMaxClasses();
+	}
+
+	// 제한에 도달하면 "+ 반 추가" 버튼을 비활성화해서 못 누르게 함
+	private void updateAddButtonState() {
+		if (addBtn == null) return;
+		boolean limitReached = isClassLimitReached();
+		addBtn.setEnabled(!limitReached);
+		addBtn.setToolTipText(limitReached
+				? "데모 상태에서는 반을 " + DataManager.getMaxClasses() + "개까지만 만들 수 있습니다"
+				: null);
 	}
 	
 	//추가 다이어로그

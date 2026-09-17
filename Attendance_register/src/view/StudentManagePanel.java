@@ -27,6 +27,8 @@ public class StudentManagePanel extends JPanel {
 	//과리열 상태 필드
 	private int hoverRow = -1; //0=수정, 1=삭제
 	private int hoverBtn = -1;
+
+	private JButton addBtn; // 데모 상태에서 학생 수 제한에 걸리면 비활성화하기 위해 필드로 보관
 	
 	//다이얼로그 크기 필드
 	private final int Dialog_weight = 400;
@@ -53,7 +55,7 @@ public class StudentManagePanel extends JPanel {
 		title.setForeground(new Color(17, 24, 39));
  
 		// 학생 추가 버튼
-		JButton addBtn = new JButton("+ 학생 추가");
+		addBtn = new JButton("+ 학생 추가");
 		addBtn.setFont(new Font("맑은 고딕", Font.BOLD, 12));
 		addBtn.setBackground(BLUE);
 		addBtn.setForeground(WHITE);
@@ -69,7 +71,15 @@ public class StudentManagePanel extends JPanel {
 			@Override public void mousePressed(MouseEvent e)  { addBtn.setBackground(BTN_PRESS); }
 			@Override public void mouseReleased(MouseEvent e) { addBtn.setBackground(BTN_HOVER); }
 		});
-		addBtn.addActionListener(e -> showAddDialog());
+		addBtn.addActionListener(e -> { //데모 상태에서 제한에 걸리면 다이얼로그 자체를 열지 않음
+			if (isStudentLimitReached()) {
+				JOptionPane.showMessageDialog(this,
+					"데모 상태에서는 학생을 " + DataManager.getMaxStudents() + "명까지만 등록할 수 있습니다.\n결제 후 이용해주세요.",
+					"데모 제한", JOptionPane.WARNING_MESSAGE);
+				return;
+			}
+			showAddDialog();
+		});
  
 		titleBar.add(title,  BorderLayout.WEST);
 		titleBar.add(addBtn, BorderLayout.EAST);
@@ -237,6 +247,24 @@ public class StudentManagePanel extends JPanel {
 	            ""
 	        });
 	    }
+
+	    updateAddButtonState();
+	}
+
+	// 데모 상태에서 이미 학생 수 제한에 도달했는지 확인
+	private boolean isStudentLimitReached() {
+		return DataManager.isDemo() && DataManager.getMaxStudents() != null
+				&& DataManager.getStudent().size() >= DataManager.getMaxStudents();
+	}
+
+	// 제한에 도달하면 "+ 학생 추가" 버튼을 비활성화해서 못 누르게 함
+	private void updateAddButtonState() {
+		if (addBtn == null) return;
+		boolean limitReached = isStudentLimitReached();
+		addBtn.setEnabled(!limitReached);
+		addBtn.setToolTipText(limitReached
+				? "데모 상태에서는 학생을 " + DataManager.getMaxStudents() + "명까지만 등록할 수 있습니다"
+				: null);
 	}
 	//학생 정보 추가 창
 	private void showAddDialog() {

@@ -156,6 +156,43 @@ public class DataManager {
     public static boolean isLoggedIn() { return authToken != null; }
     public static String getCurrentUsername() { return currentUsername; }
 
+    // =====================================================
+    // 구독(결제) 상태 - 데모 상태면 반/학생 수, 캘린더 이동 범위가 제한됨
+    // (실제 제한 판단은 서버가 하고, 여기서는 그 결과를 화면에 반영하기 위해 캐싱만 함)
+    // =====================================================
+    private static String planStatus = "ACTIVE";
+    private static Integer maxClasses = null;
+    private static Integer maxStudents = null;
+    private static java.time.YearMonth allowedMonth = null;
+
+    public static boolean isDemo() { return "DEMO".equals(planStatus); }
+    public static Integer getMaxClasses() { return maxClasses; }
+    public static Integer getMaxStudents() { return maxStudents; }
+    public static java.time.YearMonth getAllowedMonth() { return allowedMonth; }
+
+    private static void loadPlan() {
+        planStatus = "ACTIVE";
+        maxClasses = null;
+        maxStudents = null;
+        allowedMonth = null;
+        try {
+            String body = httpGet("/me/plan");
+            JsonObject obj = JsonParser.parseString(body).getAsJsonObject();
+            planStatus = obj.get("status").getAsString();
+            if (obj.has("maxClasses") && !obj.get("maxClasses").isJsonNull()) {
+                maxClasses = obj.get("maxClasses").getAsInt();
+            }
+            if (obj.has("maxStudents") && !obj.get("maxStudents").isJsonNull()) {
+                maxStudents = obj.get("maxStudents").getAsInt();
+            }
+            if (obj.has("allowedMonth") && !obj.get("allowedMonth").isJsonNull()) {
+                allowedMonth = java.time.YearMonth.parse(obj.get("allowedMonth").getAsString());
+            }
+        } catch (Exception e) {
+            System.err.println("구독 상태 조회 실패 (서버 연결 확인 필요): " + e.getMessage());
+        }
+    }
+
     // 회원가입: 성공하면 바로 로그인된 상태가 됨 (서버가 가입과 동시에 토큰을 내려줌)
     public static String signup(String username, String password) {
         return authenticate("/auth/signup", username, password);
@@ -221,12 +258,17 @@ public class DataManager {
         classMap.clear();
         knownClassIds.clear();
         knownStudentIds.clear();
+        planStatus = "ACTIVE";
+        maxClasses = null;
+        maxStudents = null;
+        allowedMonth = null;
     }
 
     // =====================================================
     // 프로그램 시작 시 호출, 서버에서 전체 데이터 불러오기
     // =====================================================
     public static void loadAll() {
+        loadPlan();
         loadClasses();
         loadStudents();
         loadAttendance();

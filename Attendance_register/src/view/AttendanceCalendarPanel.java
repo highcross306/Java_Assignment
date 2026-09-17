@@ -19,6 +19,8 @@ public class AttendanceCalendarPanel extends JPanel {
     private JComboBox<String> classCombo;
     private JComboBox<String> studentCombo;
     private JLabel monthLabel;
+    private JButton prevBtn;
+    private JButton nextBtn;
     private java.time.YearMonth currentMonth = java.time.YearMonth.now();
     
     //달력 필드
@@ -99,8 +101,8 @@ public class AttendanceCalendarPanel extends JPanel {
         studentCombo.addActionListener(e -> refreshCalendar()); //학생 선택 시 달력 초기화
 
         // 월 이동 버튼
-        JButton prevBtn = new JButton("< 이전");
-        JButton nextBtn = new JButton("다음 >");
+        prevBtn = new JButton("< 이전");
+        nextBtn = new JButton("다음 >");
         monthLabel = new JLabel("", SwingConstants.CENTER);
         monthLabel.setFont(new Font("맑은 고딕", Font.BOLD, 13));
         monthLabel.setPreferredSize(new Dimension(100, 32));
@@ -117,12 +119,18 @@ public class AttendanceCalendarPanel extends JPanel {
         }
 
         prevBtn.addActionListener(e -> {
-            currentMonth = currentMonth.minusMonths(1); //이전
-            refreshCalendar();
+            java.time.YearMonth target = currentMonth.minusMonths(1); //이전
+            if (isMonthAllowed(target)) {
+                currentMonth = target;
+                refreshCalendar();
+            }
         });
         nextBtn.addActionListener(e -> {
-            currentMonth = currentMonth.plusMonths(1); //다음
-            refreshCalendar();
+            java.time.YearMonth target = currentMonth.plusMonths(1); //다음
+            if (isMonthAllowed(target)) {
+                currentMonth = target;
+                refreshCalendar();
+            }
         });
 
         bar.add(classLabel); //반
@@ -163,12 +171,28 @@ public class AttendanceCalendarPanel extends JPanel {
         }
     }
     
+    // 데모 상태에서 이동하려는 달이 허용된 달(이번 달)인지 확인. ACTIVE 상태는 항상 허용
+    private boolean isMonthAllowed(java.time.YearMonth month) {
+        java.time.YearMonth allowed = model.DataManager.getAllowedMonth();
+        return allowed == null || month.equals(allowed);
+    }
+
     //달력 초기화
     private void refreshCalendar() {
     	if (calendarPanel == null || detailPanel == null) return; // calendarPanel 미초기화 시 종료
-    	
+
+    	// 데모 상태에서 허용된 달을 벗어나 있으면(예: 자정을 넘겨 달이 바뀐 경우) 강제로 되돌림
+    	java.time.YearMonth allowed = model.DataManager.getAllowedMonth();
+    	if (allowed != null && !currentMonth.equals(allowed)) {
+    	    currentMonth = allowed;
+    	}
+
+    	prevBtn.setEnabled(isMonthAllowed(currentMonth.minusMonths(1)));
+    	nextBtn.setEnabled(isMonthAllowed(currentMonth.plusMonths(1)));
+
         monthLabel.setText(currentMonth.getYear() + "년 " +
-            currentMonth.getMonthValue() + "월");
+            currentMonth.getMonthValue() + "월" +
+            (model.DataManager.isDemo() ? " (데모)" : ""));
 
         calendarPanel.removeAll(); //기존 달력 지우기
 

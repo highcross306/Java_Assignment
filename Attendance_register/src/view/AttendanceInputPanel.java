@@ -99,7 +99,9 @@ public class AttendanceInputPanel extends JPanel {
         
         // 날짜 변경 시 테이블 갱신
         dateSpinner.addChangeListener(e -> refreshTable());
-        
+
+        applyDemoDateBounds(); // 데모 상태면 스피너로 선택 가능한 날짜를 이번 달로 제한
+
         bar.add(classLabel);
         bar.add(classCombo); //반 선택 콤보 상자
         bar.add(Box.createHorizontalStrut(16));
@@ -375,6 +377,30 @@ public class AttendanceInputPanel extends JPanel {
         for (Class_Info cls : DataManager.getClasses()) {
             classCombo.addItem(cls.getClass_Name());
         }
+        applyDemoDateBounds(); // 구독 상태가 바뀌었을 수 있으므로 다시 확인
         refreshTable(); //테이블 초기화
+    }
+
+    // 데모 상태면 날짜 스피너로 선택 가능한 범위를 이번 달로 제한 (ACTIVE면 제한 없음)
+    private void applyDemoDateBounds() {
+        SpinnerDateModel model = (SpinnerDateModel) dateSpinner.getModel();
+        java.time.YearMonth allowed = DataManager.getAllowedMonth();
+        if (allowed == null) {
+            model.setStart(null);
+            model.setEnd(null);
+            return;
+        }
+
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        Date startDate = Date.from(allowed.atDay(1).atStartOfDay(zone).toInstant());
+        Date endDate = Date.from(allowed.atEndOfMonth().atStartOfDay(zone).toInstant());
+        model.setStart(startDate);
+        model.setEnd(endDate);
+
+        // 범위를 벗어난 값이 선택돼 있으면 오늘 날짜로 되돌림
+        Date current = (Date) model.getValue();
+        if (current.before(startDate) || current.after(endDate)) {
+            model.setValue(new Date());
+        }
     }
 }
