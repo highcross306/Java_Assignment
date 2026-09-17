@@ -229,6 +229,8 @@ public class AttendanceInputPanel extends JPanel {
     
     //테이블 초기화
     private void refreshTable() {
+        if (tableModel == null) return; // 생성자에서 buildSelectBar()가 buildTable()보다 먼저 실행되는 동안
+                                         // 날짜 스피너 초기화(applyDemoDateBounds)가 change 이벤트를 미리 발생시킬 수 있음
         tableModel.setRowCount(0);
         if (classCombo.getItemCount() == 0) return;
 
