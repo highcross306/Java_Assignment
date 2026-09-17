@@ -177,19 +177,34 @@ public class DataManager {
         allowedMonth = null;
         try {
             String body = httpGet("/me/plan");
-            JsonObject obj = JsonParser.parseString(body).getAsJsonObject();
-            planStatus = obj.get("status").getAsString();
-            if (obj.has("maxClasses") && !obj.get("maxClasses").isJsonNull()) {
-                maxClasses = obj.get("maxClasses").getAsInt();
-            }
-            if (obj.has("maxStudents") && !obj.get("maxStudents").isJsonNull()) {
-                maxStudents = obj.get("maxStudents").getAsInt();
-            }
-            if (obj.has("allowedMonth") && !obj.get("allowedMonth").isJsonNull()) {
-                allowedMonth = java.time.YearMonth.parse(obj.get("allowedMonth").getAsString());
-            }
+            applyPlanJson(JsonParser.parseString(body).getAsJsonObject());
         } catch (Exception e) {
             System.err.println("구독 상태 조회 실패 (서버 연결 확인 필요): " + e.getMessage());
+        }
+    }
+
+    private static void applyPlanJson(JsonObject obj) {
+        planStatus = obj.get("status").getAsString();
+        maxClasses = (obj.has("maxClasses") && !obj.get("maxClasses").isJsonNull())
+                ? obj.get("maxClasses").getAsInt() : null;
+        maxStudents = (obj.has("maxStudents") && !obj.get("maxStudents").isJsonNull())
+                ? obj.get("maxStudents").getAsInt() : null;
+        allowedMonth = (obj.has("allowedMonth") && !obj.get("allowedMonth").isJsonNull())
+                ? java.time.YearMonth.parse(obj.get("allowedMonth").getAsString()) : null;
+    }
+
+    // 테스트용: 비밀번호(1234)를 맞게 입력하면 서버에서 DEMO <-> ACTIVE를 전환해줌.
+    // 실제 결제(PG) 연동 전까지 "결제 완료"를 사람이 직접 흉내내기 위한 임시 버튼용 메소드.
+    // 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지를 반환
+    public static String togglePlanMock(String password) {
+        try {
+            JsonObject json = new JsonObject();
+            json.addProperty("password", password);
+            String body = httpPost("/me/plan/mock-pay", json.toString());
+            applyPlanJson(JsonParser.parseString(body).getAsJsonObject());
+            return null;
+        } catch (Exception e) {
+            return friendlyMessage(e);
         }
     }
 
@@ -223,12 +238,7 @@ public class DataManager {
                 return null;
             }
 
-            try {
-                JsonObject err = JsonParser.parseString(res.body()).getAsJsonObject();
-                return optString(err, "message", "요청이 실패했습니다 (코드 " + res.statusCode() + ")");
-            } catch (Exception parseError) {
-                return "요청이 실패했습니다 (코드 " + res.statusCode() + ")";
-            }
+            return errorMessageFrom(res);
         } catch (Exception e) {
             return "서버에 연결할 수 없습니다: " + e.getMessage();
         }
@@ -275,11 +285,14 @@ public class DataManager {
     }
 
     // 저장 버튼 등에서 호출, 로컬에 있는 변경사항을 서버로 올림
-    public static void saveAll() {
-        saveClasses();
-        saveStudents();
+    // 반환값: 실패한 항목이 있으면 화면에 그대로 보여줄 에러 메시지 목록 (비어있으면 전부 성공)
+    public static List<String> saveAll() {
+        List<String> errors = new ArrayList<>();
+        errors.addAll(saveClasses());
+        errors.addAll(saveStudents());
         // 출석 기록(records)은 addRecord/updateRecord 호출 시점에
         // 이미 곧바로 서버에 반영되기 때문에 여기서 따로 보낼 게 없음
+        return errors;
     }
 
     // =====================================================
@@ -295,9 +308,32 @@ public class DataManager {
         return builder;
     }
 
+    // 서버가 4xx/5xx로 응답했을 때, 그 이유를 화면에 그대로 보여줄 수 있도록 던지는 예외
+    // (기존에는 각 메서드가 이 상황을 조용히 System.err로만 남기고 넘어가서, 예를 들어
+    // 데모 상태 제한에 걸려 저장이 거부돼도 사용자는 아무 반응도 못 보는 문제가 있었음)
+    public static class ApiException extends RuntimeException {
+        public ApiException(String message) { super(message); }
+    }
+
+    // 서버 응답 바디의 "message" 필드를 꺼내거나, 없으면 상태 코드로 기본 메시지를 만듦
+    private static String errorMessageFrom(HttpResponse<String> res) {
+        try {
+            JsonObject err = JsonParser.parseString(res.body()).getAsJsonObject();
+            return optString(err, "message", "요청이 실패했습니다 (코드 " + res.statusCode() + ")");
+        } catch (Exception parseError) {
+            return "요청이 실패했습니다 (코드 " + res.statusCode() + ")";
+        }
+    }
+
+    // ApiException(서버가 이유를 알려준 경우)이면 그 메시지 그대로, 아니면(네트워크 오류 등) 안내 문구로 변환
+    private static String friendlyMessage(Exception e) {
+        return (e instanceof ApiException) ? e.getMessage() : "서버에 연결할 수 없습니다: " + e.getMessage();
+    }
+
     private static String httpGet(String path) throws IOException, InterruptedException {
         HttpRequest req = authorizedBuilder(path).GET().build();
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (res.statusCode() >= 400) throw new ApiException(errorMessageFrom(res));
         return res.body();
     }
 
@@ -307,6 +343,7 @@ public class DataManager {
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (res.statusCode() >= 400) throw new ApiException(errorMessageFrom(res));
         return res.body();
     }
 
@@ -315,12 +352,14 @@ public class DataManager {
                 .header("Content-Type", "application/json; charset=UTF-8")
                 .PUT(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
-        client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (res.statusCode() >= 400) throw new ApiException(errorMessageFrom(res));
     }
 
     private static void httpDelete(String path) throws IOException, InterruptedException {
         HttpRequest req = authorizedBuilder(path).DELETE().build();
-        client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (res.statusCode() >= 400) throw new ApiException(errorMessageFrom(res));
     }
 
     // =====================================================
@@ -345,7 +384,10 @@ public class DataManager {
         }
     }
 
-    private static void saveClasses() {
+    private static List<String> saveClasses() {
+        List<String> errors = new ArrayList<>();
+        List<Class_Info> rejected = new ArrayList<>(); // 서버에 한 번도 저장된 적 없다가 거절된 항목 (무한 재시도 방지용)
+
         // 1) 로컬에 있는 항목들을 서버로 반영 (새 항목은 등록, 기존 항목은 수정)
         for (Class_Info cls : classes) {
             try {
@@ -369,9 +411,14 @@ public class DataManager {
                     knownClassIds.add(serverId);
                 }
             } catch (Exception e) {
-                System.err.println("반 저장 실패: " + e.getMessage());
+                errors.add("반 '" + cls.getClass_Name() + "' 저장 실패: " + friendlyMessage(e));
+                if (!knownClassIds.contains(cls.getClass_Id())) {
+                    rejected.add(cls); // 서버가 거절한 신규 항목은 로컬에도 남겨두지 않음
+                }
             }
         }
+        classes.removeAll(rejected);
+        for (Class_Info cls : rejected) classMap.remove(cls.getClass_Id());
 
         // 2) 로컬에서는 삭제됐는데 서버에는 아직 남아있는 항목 -> 서버에서도 삭제
         Set<Integer> currentIds = new HashSet<>();
@@ -384,9 +431,10 @@ public class DataManager {
                 httpDelete("/classes/" + deletedId);
                 knownClassIds.remove(deletedId);
             } catch (Exception e) {
-                System.err.println("반 삭제 실패: " + e.getMessage());
+                errors.add("반 삭제 실패(ID " + deletedId + "): " + friendlyMessage(e));
             }
         }
+        return errors;
     }
 
     // =====================================================
@@ -418,7 +466,10 @@ public class DataManager {
         }
     }
 
-    private static void saveStudents() {
+    private static List<String> saveStudents() {
+        List<String> errors = new ArrayList<>();
+        List<Student> rejected = new ArrayList<>(); // 서버에 한 번도 저장된 적 없다가 거절된 항목 (무한 재시도 방지용)
+
         for (Student s : students) {
             try {
                 JsonObject json = new JsonObject();
@@ -441,9 +492,14 @@ public class DataManager {
                     knownStudentIds.add(serverId);
                 }
             } catch (Exception e) {
-                System.err.println("학생 저장 실패: " + e.getMessage());
+                errors.add("학생 '" + s.getName() + "' 저장 실패: " + friendlyMessage(e));
+                if (!knownStudentIds.contains(s.getStudent_id())) {
+                    rejected.add(s);
+                }
             }
         }
+        students.removeAll(rejected);
+        for (Student s : rejected) studentMap.remove(s.getStudent_id());
 
         Set<Integer> currentIds = new HashSet<>();
         for (Student s : students) currentIds.add(s.getStudent_id());
@@ -455,9 +511,10 @@ public class DataManager {
                 httpDelete("/students/" + deletedId);
                 knownStudentIds.remove(deletedId);
             } catch (Exception e) {
-                System.err.println("학생 삭제 실패: " + e.getMessage());
+                errors.add("학생 삭제 실패(ID " + deletedId + "): " + friendlyMessage(e));
             }
         }
+        return errors;
     }
 
     // =====================================================
@@ -531,31 +588,47 @@ public class DataManager {
     // 서버의 AttendanceController가 "있으면 수정, 없으면 등록"을 알아서 처리해주기 때문에
     // 여기서는 항상 같은 방식(POST)으로 보내면 됨
     // =====================================================
-    public static void addRecord(AttendanceRecord record) {
+    // 반환값: 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지 (실패 시 로컬에 추가했던 기록도 되돌림)
+    public static String addRecord(AttendanceRecord record) {
         records.add(record);
-        sendAttendanceToServer(record);
+        String error = sendAttendanceToServer(record);
+        if (error != null) {
+            records.remove(record);
+        }
+        return error;
     }
 
-    public static void updateRecord(int student_id, LocalDate date, AttendanceStatus status, String reason) {
+    // 반환값: 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지 (실패 시 변경 전 상태로 되돌림)
+    public static String updateRecord(int student_id, LocalDate date, AttendanceStatus status, String reason) {
         for (AttendanceRecord r : records) {
             if (r.getStudent_Id() == student_id && r.getDate().equals(date)) {
+                AttendanceStatus oldStatus = r.getStatus();
+                String oldReason = r.getReason();
                 r.setStatus(status);
                 r.setReason(reason);
-                sendAttendanceToServer(r);
-                return;
+                String error = sendAttendanceToServer(r);
+                if (error != null) {
+                    r.setStatus(oldStatus);
+                    r.setReason(oldReason);
+                }
+                return error;
             }
         }
 
         Student s = findStudentById(student_id);
         if (s != null) {
             AttendanceRecord newRecord = new AttendanceRecord(student_id, s.getClass_Id(), date, status, reason);
-            addRecord(newRecord);
+            return addRecord(newRecord);
         }
+        return null;
     }
 
     // 특정 날짜 + 특정 반의 출석 기록 전체 삭제
     // AttendanceInputPanel의 "초기화" 버튼에서 호출됨
-    public static void deleteRecordsByClassAndDate(int classId, LocalDate date) {
+    // 반환값: 실패한 항목이 있으면 화면에 그대로 보여줄 에러 메시지 목록 (비어있으면 전부 성공)
+    public static List<String> deleteRecordsByClassAndDate(int classId, LocalDate date) {
+        List<String> errors = new ArrayList<>();
+
         // 1) 서버에서 해당 조건의 기록 id 목록을 조회해서 삭제 요청
         try {
             String body = httpGet("/attendance?classId=" + classId + "&date=" + date.toString());
@@ -563,19 +636,25 @@ public class DataManager {
             for (int i = 0; i < arr.size(); i++) {
                 JsonObject obj = arr.get(i).getAsJsonObject();
                 int id = obj.get("id").getAsInt();
-                httpDelete("/attendance/" + id);
+                try {
+                    httpDelete("/attendance/" + id);
+                } catch (Exception e) {
+                    errors.add(friendlyMessage(e));
+                }
             }
         } catch (Exception e) {
-            System.err.println("출석 기록 삭제 실패: " + e.getMessage());
+            errors.add(friendlyMessage(e));
         }
 
         // 2) 로컬 리스트에서도 제거
         records.removeIf(r ->
             r.getClass_Id() == classId && r.getDate().equals(date)
         );
+        return errors;
     }
 
-    private static void sendAttendanceToServer(AttendanceRecord r) {
+    // 반환값: 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지
+    private static String sendAttendanceToServer(AttendanceRecord r) {
         try {
             JsonObject json = new JsonObject();
             json.addProperty("studentId", r.getStudent_Id());
@@ -585,8 +664,11 @@ public class DataManager {
             json.addProperty("reason", r.getReason() == null ? "" : r.getReason());
 
             httpPost("/attendance", json.toString());
+            return null;
         } catch (Exception e) {
-            System.err.println("출석 기록 저장 실패 (서버 연결 확인 필요): " + e.getMessage());
+            String msg = friendlyMessage(e);
+            System.err.println("출석 기록 저장 실패: " + msg);
+            return msg;
         }
     }
 }

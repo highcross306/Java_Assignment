@@ -98,6 +98,19 @@ public class MainFrame extends JFrame{
 
 		refreshBtn.addActionListener(e -> refreshCurrentPanel()); //클릭 시 현재 화면 새로고침
 
+		// 결제 테스트 버튼 - 실제 PG 연동 전까지, 비밀번호(1234)를 입력하면 DEMO <-> ACTIVE를 전환해서 테스트할 수 있게 함
+		JButton payTestBtn = new JButton("결제 상태 전환 (테스트)");
+		payTestBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		payTestBtn.setForeground(GRAY_TXT);
+		payTestBtn.setBackground(WHITE);
+		payTestBtn.setFocusPainted(false);
+		payTestBtn.setBorderPainted(true);
+		payTestBtn.setOpaque(true);
+		payTestBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		payTestBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		payTestBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		payTestBtn.addActionListener(e -> togglePlanForTesting());
+
 		JButton logoutBtn = new JButton("로그아웃");
 		logoutBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
 		logoutBtn.setForeground(GRAY_TXT);
@@ -113,8 +126,31 @@ public class MainFrame extends JFrame{
 		panel.add(userLabel);
 		panel.add(refreshBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
+		panel.add(payTestBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(logoutBtn);
 		return panel;
+	}
+
+	// 결제 확인 비밀번호(테스트용 1234)를 입력받아 서버에 전달, DEMO <-> ACTIVE 전환 결과를 화면에 반영
+	private void togglePlanForTesting() {
+		JPasswordField passwordField = new JPasswordField();
+		int result = JOptionPane.showConfirmDialog(
+				this, passwordField, "결제 확인 비밀번호를 입력하세요 (테스트용)",
+				JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+		if (result != JOptionPane.OK_OPTION) return;
+
+		String password = new String(passwordField.getPassword());
+		String error = DataManager.togglePlanMock(password);
+		if (error != null) {
+			JOptionPane.showMessageDialog(this, error, "전환 실패", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+
+		JOptionPane.showMessageDialog(this,
+				"구독 상태가 " + (DataManager.isDemo() ? "DEMO" : "ACTIVE") + "로 전환되었습니다.",
+				"전환 완료", JOptionPane.INFORMATION_MESSAGE);
+		refreshCurrentPanel(); // 바뀐 제한값을 현재 화면에 즉시 반영
 	}
 
 	//로그아웃: 확인 후 변경사항을 저장하고, 이 창을 닫은 뒤 로그인 화면부터 다시 시작

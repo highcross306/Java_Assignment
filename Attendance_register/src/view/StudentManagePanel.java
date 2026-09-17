@@ -3,6 +3,7 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.List;
 import javax.swing.table.*;
 import model.*;
 
@@ -314,8 +315,12 @@ public class StudentManagePanel extends JPanel {
 	    if (result == JOptionPane.YES_OPTION) { //학생 정보 지우기
 	        DataManager.getStudent().removeIf(
 	            s -> s.getStudent_id() == target.getStudent_id());
-	        DataManager.saveAll(); // 즉시 저장
+	        List<String> errors = DataManager.saveAll(); // 즉시 저장
 	        refreshTable();
+	        if (!errors.isEmpty()) {
+	            JOptionPane.showMessageDialog(this,
+	                String.join("\n", errors), "삭제 실패", JOptionPane.ERROR_MESSAGE);
+	        }
 	    }
 	}
 	
@@ -459,6 +464,7 @@ public class StudentManagePanel extends JPanel {
 		        	if (selIdx == 0) throw new Exception("반을 선택하세요."); // 반 필수 선택 예외 처리
 		        	
 		            int classId = DataManager.getClasses().get(selIdx - 1).getClass_Id(); //플레이스 홀더를 재외해야 하므로 selIdx - 1 계산을 수행
+		            List<String> errors;
 	
 		            if (existing == null) {
 		                // 추가 모드
@@ -467,7 +473,7 @@ public class StudentManagePanel extends JPanel {
 		                s.setStudent_Phone(phone);
 		                s.setGuardian_Phone(guardian);
 		                DataManager.getStudent().add(s);
-		                DataManager.saveAll(); // 즉시 저장
+		                errors = DataManager.saveAll(); // 즉시 저장
 		            } else {
 		                // 수정 모드
 		                existing.setName(name);
@@ -475,9 +481,14 @@ public class StudentManagePanel extends JPanel {
 		                existing.setClass_Id(classId);
 		                existing.setStudent_Phone(phone);
 		                existing.setGuardian_Phone(guardian);
-		                DataManager.saveAll(); // 즉시 저장
+		                errors = DataManager.saveAll(); // 즉시 저장
 		            }
-		            refreshTable();
+		            refreshTable(); // 실패한 신규 항목은 저장 시 자동으로 되돌려짐
+		            if (!errors.isEmpty()) {
+		                JOptionPane.showMessageDialog(dialog,
+		                    String.join("\n", errors), "저장 실패", JOptionPane.ERROR_MESSAGE);
+		                return; // 다이얼로그는 유지, 사용자가 확인 후 다시 시도하거나 취소
+		            }
 		            dialog.dispose();
 		            saved = true; //저장 성공 시에 반복을 종료
 	

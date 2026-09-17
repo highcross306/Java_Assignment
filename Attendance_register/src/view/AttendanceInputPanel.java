@@ -6,6 +6,7 @@ import java.awt.event.*;
 import javax.swing.table.*;
 import model.*;
 import java.util.*;
+import java.util.List;
 import java.time.LocalDate;
 
 public class AttendanceInputPanel extends JPanel {
@@ -301,7 +302,7 @@ public class AttendanceInputPanel extends JPanel {
                 Class_Info selectedClass = DataManager.getClasses().get(selIdx);
 
                 // 해당 날짜 + 해당 반의 출석 기록 삭제 (로컬 + 서버 동시 반영)
-                DataManager.deleteRecordsByClassAndDate(
+                List<String> errors = DataManager.deleteRecordsByClassAndDate(
                     selectedClass.getClass_Id(), date
                 );
 
@@ -310,6 +311,11 @@ public class AttendanceInputPanel extends JPanel {
                 reasonMap.clear();
 
                 refreshTable();
+
+                if (!errors.isEmpty()) {
+                    JOptionPane.showMessageDialog(this,
+                        String.join("\n", errors), "삭제 실패", JOptionPane.ERROR_MESSAGE);
+                }
             }
         });;
 
@@ -348,8 +354,10 @@ public class AttendanceInputPanel extends JPanel {
         if (table.isEditing()) table.getCellEditor().stopCellEditing();
         
         //각 열별로 출석 상태 저장
+        List<String> errors = new ArrayList<>();
         for (int row = 0; row < tableModel.getRowCount(); row++) {
             int studentId = (int) tableModel.getValueAt(row, 0);
+            String studentName = (String) tableModel.getValueAt(row, 1);
             String statusStr = (String) tableModel.getValueAt(row, 2);
             String reason   = tableModel.getValueAt(row, 3) == null ? "" : tableModel.getValueAt(row, 3).toString(); //사유는 비어 있으면 ""을 저장
 
@@ -361,14 +369,25 @@ public class AttendanceInputPanel extends JPanel {
                 case "공결" -> AttendanceStatus.EXCUSED;
                 default    -> AttendanceStatus.PRESENT;
             };
-            
+
             //DataManger를 통해 내용 저장하기
-            DataManager.updateRecord(studentId, date, status, reason);
+            String error = DataManager.updateRecord(studentId, date, status, reason);
+            if (error != null) {
+                errors.add(studentName + ": " + error);
+            }
         }
 
-        JOptionPane.showMessageDialog(this,
-            selectedClass.getClass_Name() + " 출석이 저장되었습니다.",
-            "저장 완료", JOptionPane.INFORMATION_MESSAGE);
+        refreshTable(); // 실패한 항목은 저장 시도 전 상태로 되돌려져 있으므로 다시 반영
+
+        if (errors.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                selectedClass.getClass_Name() + " 출석이 저장되었습니다.",
+                "저장 완료", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                "일부 출석 기록 저장에 실패했습니다:\n" + String.join("\n", errors),
+                "저장 실패", JOptionPane.ERROR_MESSAGE);
+        }
     }
     
     //메인에서 쓸 refresh 메소드

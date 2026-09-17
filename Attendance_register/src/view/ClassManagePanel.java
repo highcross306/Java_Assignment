@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.List;
 import model.*;
 
 public class ClassManagePanel extends JPanel{
@@ -337,8 +338,13 @@ public class ClassManagePanel extends JPanel{
 	        // 새 반 ID = 현재 반 수 + 1
 	        int newId = DataManager.getClasses().size() + 1;
 	        DataManager.getClasses().add(new Class_Info(newId, name));
-	        DataManager.saveAll(); // 즉시 저장
-	        refreshTable();   // 테이블 갱신
+	        List<String> errors = DataManager.saveAll(); // 즉시 저장
+	        refreshTable();   // 테이블 갱신 (실패한 항목은 저장 시 자동으로 되돌려짐)
+	        if (!errors.isEmpty()) {
+	            JOptionPane.showMessageDialog(dialog,
+	                String.join("\n", errors), "저장 실패", JOptionPane.ERROR_MESSAGE);
+	            return; // 다이얼로그를 닫지 않고 사용자가 확인할 수 있게 함
+	        }
 	        dialog.dispose();
 	    });
 
@@ -420,8 +426,13 @@ public class ClassManagePanel extends JPanel{
 	        if (cls != null) {
 	            cls.setClass_Name(name);
 	        }
-	        DataManager.saveAll(); // 즉시 저장
+	        List<String> errors = DataManager.saveAll(); // 즉시 저장
 	        refreshTable();   // 테이블 갱신
+	        if (!errors.isEmpty()) {
+	            JOptionPane.showMessageDialog(dialog,
+	                String.join("\n", errors), "저장 실패", JOptionPane.ERROR_MESSAGE);
+	            return;
+	        }
 	        dialog.dispose();
 	    });
 
@@ -458,8 +469,12 @@ public class ClassManagePanel extends JPanel{
 	        DataManager.getClasses().removeIf(
 	            cls -> cls.getClass_Id() == classId
 	        );
-	        DataManager.saveAll(); // CSV로 즉시 저장
+	        List<String> errors = DataManager.saveAll(); // CSV로 즉시 저장
 	        refreshTable(); // 테이블 갱신
+	        if (!errors.isEmpty()) {
+	            JOptionPane.showMessageDialog(this,
+	                String.join("\n", errors), "삭제 실패", JOptionPane.ERROR_MESSAGE);
+	        }
 	    }
 	}
 	
