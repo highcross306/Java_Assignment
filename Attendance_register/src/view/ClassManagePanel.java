@@ -335,8 +335,8 @@ public class ClassManagePanel extends JPanel{
 	            return;
 	        }
 
-	        // 새 반 ID = 현재 반 수 + 1
-	        int newId = DataManager.getClasses().size() + 1;
+	        // 새 반의 임시 로컬 ID (저장되면 서버가 실제로 발급한 ID로 교체됨)
+	        int newId = DataManager.getNextClassId();
 	        DataManager.getClasses().add(new Class_Info(newId, name));
 	        List<String> errors = DataManager.saveAll(); // 즉시 저장
 	        refreshTable();   // 테이블 갱신 (실패한 항목은 저장 시 자동으로 되돌려짐)

@@ -567,6 +567,18 @@ public class DataManager {
         return max + 1;
     }
 
+    // 반을 새로 추가할 때 쓸 임시 로컬 ID. 서버 저장이 끝나면 서버가 실제로 발급한 ID로 바로 교체되지만,
+    // 저장되기 전까지 잠깐 쓰이는 이 임시값이 "이미 알고 있는" 다른 반의 ID와 절대 겹치면 안 된다.
+    // (예전에는 getClasses().size() + 1을 썼는데, 반 ID는 여러 학원이 공유하는 서버의 전역 증가값이라
+    //  중간에 삭제된 반이 있으면 로컬 개수만으로는 빈 자리를 예측할 수 없어 기존 ID와 충돌하는 버그가 있었음)
+    public static int getNextClassId() {
+        int max = 0;
+        for (Class_Info c : classes) {
+            if (c.getClass_Id() > max) max = c.getClass_Id();
+        }
+        return max + 1;
+    }
+
     public static int countTodayByStatus(AttendanceStatus status) {
         int count = 0;
         for (AttendanceRecord r : getTodayRecords()) {
