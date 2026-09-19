@@ -4,6 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import model.*;
 import java.awt.event.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class AttendanceCalendarPanel extends JPanel {
     private static final long serialVersionUID = 1L;
@@ -221,8 +223,18 @@ public class AttendanceCalendarPanel extends JPanel {
         int startDow = firstDay.getDayOfWeek().getValue() % 7; //시작 요일
         int lastDay  = currentMonth.lengthOfMonth(); //마지막 날짜
 
-        // 선택한 학생의 출결 기록 조회
+        // 선택한 학생의 출결 기록을 날짜별로 미리 한 번만 묶어둠
+        // (매 칸(최대 42칸)마다 전체 출결 기록을 처음부터 다시 훑지 않기 위함 -
+        //  출결 기록이 여러 달 쌓일수록 달력을 열 때마다 느려지는 걸 방지)
         Student selectedStudent = getSelectedStudent();
+        Map<java.time.LocalDate, AttendanceRecord> recordsByDate = new HashMap<>();
+        if (selectedStudent != null) {
+            for (AttendanceRecord r : DataManager.getRecords()) {
+                if (r.getStudent_Id() == selectedStudent.getStudent_id()) {
+                    recordsByDate.put(r.getDate(), r);
+                }
+            }
+        }
 
         // 빈 셀 채우기
         for (int i = 0; i < startDow; i++) {
@@ -234,7 +246,7 @@ public class AttendanceCalendarPanel extends JPanel {
         // 날짜 셀
         for (int day = 1; day <= lastDay; day++) {
             java.time.LocalDate date = currentMonth.atDay(day); //날짜 셀
-            JPanel cell = buildDayCell(day, date, selectedStudent);
+            JPanel cell = buildDayCell(day, date, recordsByDate.get(date));
             grid.add(cell);
         }
 
@@ -266,8 +278,8 @@ public class AttendanceCalendarPanel extends JPanel {
         detailPanel.repaint();
     }
 
-    // 날짜 셀 생성
-    private JPanel buildDayCell(int day, java.time.LocalDate date, Student student) {
+    // 날짜 셀 생성 (record는 이 날짜에 해당하는 선택된 학생의 출결 기록, 없으면 null)
+    private JPanel buildDayCell(int day, java.time.LocalDate date, AttendanceRecord record) {
         JPanel cell = new JPanel(new BorderLayout());
         cell.setBackground(WHITE);
      // 기본 테두리
@@ -307,62 +319,55 @@ public class AttendanceCalendarPanel extends JPanel {
         JLabel statusLbl = new JLabel("", SwingConstants.CENTER);
         statusLbl.setFont(new Font("맑은 고딕", Font.BOLD, 10));
 
-        if (student != null) { //학생이 있을 경우
-            for (AttendanceRecord r : DataManager.getRecords()) { //출결 기록에 따라서 글자를 출력한다.
-                if (r.getStudent_Id() == student.getStudent_id() &&
-                        r.getDate().equals(date)) {
-                	switch (r.getStatus()) { //출결 상태에 따라서 글자와 테두리와 칸의 색깔이 변한다. 각각 위에서부터 글자색, 배경색, 테두리이다.
-                    case PRESENT -> {
-                        statusLbl.setText("출석"); //출석 상태일때의 테두리 변화
-                        statusLbl.setForeground(new Color(21, 128, 61));
-                        cell.setBackground(new Color(240, 253, 244));
-                        cell.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(new Color(34, 197, 94), 1),
-                            BorderFactory.createEmptyBorder(4, 6, 4, 6)));
-                    }
-                    case LATE -> {
-                        statusLbl.setText("지각"); //지각 상태일때의 테두리 변화
-                        statusLbl.setForeground(new Color(161, 98, 7));
-                        cell.setBackground(new Color(254, 252, 232));
-                        cell.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(new Color(234, 179, 8), 1),
-                            BorderFactory.createEmptyBorder(4, 6, 4, 6)));
-                    }
-                    case ABSENT -> {
-                        statusLbl.setText("결석"); //결석 상태일때의 테두리 변화
-                        statusLbl.setForeground(new Color(185, 28, 28));
-                        cell.setBackground(new Color(254, 226, 226));
-                        cell.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(new Color(239, 68, 68), 1),
-                            BorderFactory.createEmptyBorder(4, 6, 4, 6)));
-                    }
-                    case EARLY_LEAVE -> {
-                        statusLbl.setText("조퇴"); //조퇴 상태일때의 테두리 변화
-                        statusLbl.setForeground(new Color(37, 99, 235));
-                        cell.setBackground(new Color(239, 246, 255));
-                        cell.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(BLUE, 1),
-                            BorderFactory.createEmptyBorder(4, 6, 4, 6)));
-                    }
-                    case EXCUSED -> {
-                        statusLbl.setText("공결"); //공결 상태일때의 테두리 변화
-                        statusLbl.setForeground(GRAY_TXT);
-                        cell.setBackground(new Color(243, 244, 246));
-                        cell.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(new Color(156, 163, 175), 1),
-                            BorderFactory.createEmptyBorder(4, 6, 4, 6)));
-                    }
-                    
+        if (record != null) { //이 날짜에 해당하는 출결 기록이 있을 경우
+        	switch (record.getStatus()) { //출결 상태에 따라서 글자와 테두리와 칸의 색깔이 변한다. 각각 위에서부터 글자색, 배경색, 테두리이다.
+                case PRESENT -> {
+                    statusLbl.setText("출석"); //출석 상태일때의 테두리 변화
+                    statusLbl.setForeground(new Color(21, 128, 61));
+                    cell.setBackground(new Color(240, 253, 244));
+                    cell.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(34, 197, 94), 1),
+                        BorderFactory.createEmptyBorder(4, 6, 4, 6)));
                 }
-                	// 오늘 날짜는 항상 마지막에 덮어씀
-                    if (date.equals(java.time.LocalDate.now())) {
-                        cell.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(BLUE, 2),
-                            BorderFactory.createEmptyBorder(4, 6, 4, 6)
-                        ));
-                    }
-                    break;
+                case LATE -> {
+                    statusLbl.setText("지각"); //지각 상태일때의 테두리 변화
+                    statusLbl.setForeground(new Color(161, 98, 7));
+                    cell.setBackground(new Color(254, 252, 232));
+                    cell.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(234, 179, 8), 1),
+                        BorderFactory.createEmptyBorder(4, 6, 4, 6)));
                 }
+                case ABSENT -> {
+                    statusLbl.setText("결석"); //결석 상태일때의 테두리 변화
+                    statusLbl.setForeground(new Color(185, 28, 28));
+                    cell.setBackground(new Color(254, 226, 226));
+                    cell.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(239, 68, 68), 1),
+                        BorderFactory.createEmptyBorder(4, 6, 4, 6)));
+                }
+                case EARLY_LEAVE -> {
+                    statusLbl.setText("조퇴"); //조퇴 상태일때의 테두리 변화
+                    statusLbl.setForeground(new Color(37, 99, 235));
+                    cell.setBackground(new Color(239, 246, 255));
+                    cell.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(BLUE, 1),
+                        BorderFactory.createEmptyBorder(4, 6, 4, 6)));
+                }
+                case EXCUSED -> {
+                    statusLbl.setText("공결"); //공결 상태일때의 테두리 변화
+                    statusLbl.setForeground(GRAY_TXT);
+                    cell.setBackground(new Color(243, 244, 246));
+                    cell.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(156, 163, 175), 1),
+                        BorderFactory.createEmptyBorder(4, 6, 4, 6)));
+                }
+            }
+        	// 오늘 날짜는 항상 마지막에 덮어씀
+            if (date.equals(java.time.LocalDate.now())) {
+                cell.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(BLUE, 2),
+                    BorderFactory.createEmptyBorder(4, 6, 4, 6)
+                ));
             }
         }
 

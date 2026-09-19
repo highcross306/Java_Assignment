@@ -142,11 +142,12 @@ public class DashboardPanel extends JPanel {
     }
     
     //요약카드 초기화
-    private void refreshCards() { //DataManager의 countTodayByStatus를 통해 해당 출결 상태의 학생 수를 계산 후, 레이블의 텍스트를 변경
+    private void refreshCards() { //출결 기록 전체를 한 번만 훑어서 오늘 상태별 인원수를 계산 후, 레이블의 텍스트를 변경
+        Map<AttendanceStatus, Integer> counts = DataManager.getTodayStatusCounts();
         totalLabel.setText(String.valueOf(DataManager.getStudent().size()));
-        presentLabel.setText(String.valueOf(DataManager.countTodayByStatus(AttendanceStatus.PRESENT)));
-        lateLabel.setText(String.valueOf(DataManager.countTodayByStatus(AttendanceStatus.LATE)));
-        absentLabel.setText(String.valueOf(DataManager.countTodayByStatus(AttendanceStatus.ABSENT)));
+        presentLabel.setText(String.valueOf(counts.get(AttendanceStatus.PRESENT)));
+        lateLabel.setText(String.valueOf(counts.get(AttendanceStatus.LATE)));
+        absentLabel.setText(String.valueOf(counts.get(AttendanceStatus.ABSENT)));
     }
     
     private JPanel buildTable() {
@@ -226,7 +227,7 @@ public class DashboardPanel extends JPanel {
 
     private void refreshTable() {
         tableModel.setRowCount(0);
-        
+
         // 정렬
         ArrayList<Student> sorted = new ArrayList<>(DataManager.getStudent());
         if (sortByClass) {
@@ -235,25 +236,27 @@ public class DashboardPanel extends JPanel {
             Collections.sort(sorted, (a, b) -> a.getName().compareTo(b.getName())); //이름 순으로 정렬
         }
 
+        // 오늘 기록을 미리 한 번만 학생 id 기준으로 묶어둠
+        // (학생마다 전체 기록을 처음부터 다시 훑지 않기 위함)
+        Map<Integer, AttendanceRecord> todayByStudent = DataManager.getTodayRecordsByStudentId();
+
         for (Student s : sorted) {
             Class_Info cls = DataManager.findClassById(s.getClass_Id());
             String className = (cls != null) ? cls.getClass_Name() : "-";
 
-         // 오늘 출결 기록 조회
+            // 오늘 출결 기록 조회
             String statusStr = "미입력"; //출결 상태 기본 출력
             String reason = ""; //출결 사유 기본 출력
-            for (AttendanceRecord r : DataManager.getTodayRecords()) {
-                if (r.getStudent_Id() == s.getStudent_id()) { //오늘 출결 상태 출력
-                    statusStr = switch (r.getStatus()) {
-                        case LATE        -> "지각";
-                        case ABSENT      -> "결석";
-                        case EARLY_LEAVE -> "조퇴";
-                        case EXCUSED     -> "공결";
-                        default          -> "출석";
-                    };
-                    reason = r.getReason() == null ? "" : r.getReason();
-                    break;
-                }
+            AttendanceRecord r = todayByStudent.get(s.getStudent_id());
+            if (r != null) {
+                statusStr = switch (r.getStatus()) {
+                    case LATE        -> "지각";
+                    case ABSENT      -> "결석";
+                    case EARLY_LEAVE -> "조퇴";
+                    case EXCUSED     -> "공결";
+                    default          -> "출석";
+                };
+                reason = r.getReason() == null ? "" : r.getReason();
             }
             tableModel.addRow(new Object[] {
                 s.getStudent_id(),

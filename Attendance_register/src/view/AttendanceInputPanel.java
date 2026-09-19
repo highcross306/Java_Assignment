@@ -13,6 +13,11 @@ public class AttendanceInputPanel extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private static final String[] STATUSES = {"출석", "지각", "결석", "조퇴", "공결"};
+    // 라디오 버튼 1개당 고정 폭 (글꼴 렌더링 차이로 컴퓨터마다 필요한 너비가 달라져
+    // 버튼이 줄바꿈되며 찌그러져 보이는 일이 없도록, 컴퓨터에 상관없이 항상 이 크기로 고정)
+    private static final int STATUS_BTN_WIDTH = 54;
+    private static final int STATUS_BTN_HEIGHT = 26;
+    private static final int STATUS_COLUMN_WIDTH = STATUS_BTN_WIDTH * STATUSES.length + 40;
     
     // 색상 상수
     private static final Color BG       = new Color(248, 249, 251);
@@ -139,7 +144,13 @@ public class AttendanceInputPanel extends JPanel {
         table.getColumnModel().getColumn(0).setPreferredWidth(50);
         table.getColumnModel().getColumn(0).setMaxWidth(50);
         table.getColumnModel().getColumn(1).setPreferredWidth(80);
-        table.getColumnModel().getColumn(2).setPreferredWidth(150);
+        // 출결 상태 열: 라디오 버튼 5개가 항상 한 줄로 다 펼쳐질 만큼 너비를 고정.
+        // preferredWidth만 주면 창 크기나(다른 컴퓨터의 화면 해상도/글꼴 렌더링 차이로
+        // 실제 필요한 폭이 이 값보다 커지는 경우) 테이블 리사이즈 시 이 열이 좁아질 수 있어서,
+        // min/max를 preferred와 동일하게 못박아 어떤 환경에서도 폭이 줄어들지 않게 함
+        table.getColumnModel().getColumn(2).setMinWidth(STATUS_COLUMN_WIDTH);
+        table.getColumnModel().getColumn(2).setMaxWidth(STATUS_COLUMN_WIDTH);
+        table.getColumnModel().getColumn(2).setPreferredWidth(STATUS_COLUMN_WIDTH);
         table.getColumnModel().getColumn(3).setPreferredWidth(200);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
@@ -168,6 +179,9 @@ public class AttendanceInputPanel extends JPanel {
                     rb.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
                     rb.setBackground(sel ? new Color(239, 246, 255) : WHITE);
                     rb.setSelected(status.equals(val)); //출결 상채를 확인하고 반영한다.
+                    // 컴퓨터마다 다른 글꼴 렌더링 크기에 맡기지 않고 항상 같은 크기로 고정
+                    // (다른 컴퓨터에서 버튼이 줄바꿈되며 찌그러져 보이던 문제의 원인)
+                    rb.setPreferredSize(new Dimension(STATUS_BTN_WIDTH, STATUS_BTN_HEIGHT));
                     group.add(rb); //ButtonGruop에 radio를 추가한다.
                     p.add(rb);
                 }

@@ -375,6 +375,7 @@ public class DataManager {
             for (int i = 0; i < arr.size(); i++) {
                 JsonObject obj = arr.get(i).getAsJsonObject();
                 Class_Info cls = new Class_Info(obj.get("classId").getAsInt(), obj.get("className").getAsString());
+                cls.clearDirty(); // 서버에서 막 받아온 상태 그대로이므로 아직 보낼 변경사항 없음
                 classes.add(cls);
                 classMap.put(cls.getClass_Id(), cls);
                 knownClassIds.add(cls.getClass_Id());
@@ -390,13 +391,19 @@ public class DataManager {
 
         // 1) 로컬에 있는 항목들을 서버로 반영 (새 항목은 등록, 기존 항목은 수정)
         for (Class_Info cls : classes) {
+            boolean isKnown = knownClassIds.contains(cls.getClass_Id());
+            // 이미 서버에 있고 마지막 동기화 이후 바뀐 적도 없는 반은 통째로 건너뜀.
+            // (예전에는 반 1개만 수정해도 나머지 모든 반까지 매번 PUT으로 다시 보내서
+            //  반/학생 수가 늘어날수록 저장이 점점 느려졌음)
+            if (isKnown && !cls.isDirty()) continue;
             try {
                 JsonObject json = new JsonObject();
                 json.addProperty("className", cls.getClass_Name());
 
-                if (knownClassIds.contains(cls.getClass_Id())) {
+                if (isKnown) {
                     // 이미 서버에 있는 반 -> 수정(PUT)
                     httpPut("/classes/" + cls.getClass_Id(), json.toString());
+                    cls.clearDirty();
                 } else {
                     // 서버에 아직 없는 반 -> 등록(POST)
                     String resBody = httpPost("/classes", json.toString());
@@ -409,6 +416,7 @@ public class DataManager {
                     cls.setClass_Id(serverId);
                     classMap.put(serverId, cls);
                     knownClassIds.add(serverId);
+                    cls.clearDirty();
                 }
             } catch (Exception e) {
                 errors.add("반 '" + cls.getClass_Name() + "' 저장 실패: " + friendlyMessage(e));
@@ -457,6 +465,7 @@ public class DataManager {
                 s.setStudent_Id(obj.get("studentId").getAsInt());
                 s.setStudent_Phone(optString(obj, "studentPhone", ""));
                 s.setGuardian_Phone(optString(obj, "guardianPhone", ""));
+                s.clearDirty(); // 서버에서 막 받아온 상태 그대로이므로 아직 보낼 변경사항 없음
                 students.add(s);
                 studentMap.put(s.getStudent_id(), s);
                 knownStudentIds.add(s.getStudent_id());
@@ -471,6 +480,11 @@ public class DataManager {
         List<Student> rejected = new ArrayList<>(); // 서버에 한 번도 저장된 적 없다가 거절된 항목 (무한 재시도 방지용)
 
         for (Student s : students) {
+            boolean isKnown = knownStudentIds.contains(s.getStudent_id());
+            // 이미 서버에 있고 마지막 동기화 이후 바뀐 적도 없는 학생은 통째로 건너뜀.
+            // (예전에는 학생 1명만 추가/수정해도 나머지 모든 학생까지 매번 PUT으로
+            //  다시 보내서 학생 수가 늘어날수록 저장이 점점 느려졌음)
+            if (isKnown && !s.isDirty()) continue;
             try {
                 JsonObject json = new JsonObject();
                 json.addProperty("name", s.getName());
@@ -479,8 +493,9 @@ public class DataManager {
                 putNullable(json, "studentPhone", s.getStudent_Phone());
                 putNullable(json, "guardianPhone", s.getGuardian_Phone());
 
-                if (knownStudentIds.contains(s.getStudent_id())) {
+                if (isKnown) {
                     httpPut("/students/" + s.getStudent_id(), json.toString());
+                    s.clearDirty();
                 } else {
                     String resBody = httpPost("/students", json.toString());
                     JsonObject created = JsonParser.parseString(resBody).getAsJsonObject();
@@ -490,6 +505,7 @@ public class DataManager {
                     s.setStudent_Id(serverId);
                     studentMap.put(serverId, s);
                     knownStudentIds.add(serverId);
+                    s.clearDirty();
                 }
             } catch (Exception e) {
                 errors.add("학생 '" + s.getName() + "' 저장 실패: " + friendlyMessage(e));
@@ -559,6 +575,34 @@ public class DataManager {
         return result;
     }
 
+    // 오늘 기록을 학생 id로 바로 찾을 수 있게 미리 맵으로 묶어서 반환.
+    // (대시보드 표에서 학생마다 매번 전체 기록을 처음부터 훑지 않도록 하기 위함 -
+    //  기록이 쌓일수록 학생 수 x 전체 기록 수만큼 느려지는 걸 방지)
+    public static HashMap<Integer, AttendanceRecord> getTodayRecordsByStudentId() {
+        LocalDate today = LocalDate.now();
+        HashMap<Integer, AttendanceRecord> map = new HashMap<>();
+        for (AttendanceRecord r : records) {
+            if (r.getDate().equals(today)) {
+                map.put(r.getStudent_Id(), r);
+            }
+        }
+        return map;
+    }
+
+    // 오늘 출결 상태별 인원수를 전체 기록을 한 번만 훑어서 전부 계산.
+    // (요약 카드 4개를 위해 매번 따로따로 전체를 훑던 것을 한 번으로 줄임)
+    public static HashMap<AttendanceStatus, Integer> getTodayStatusCounts() {
+        LocalDate today = LocalDate.now();
+        HashMap<AttendanceStatus, Integer> counts = new HashMap<>();
+        for (AttendanceStatus status : AttendanceStatus.values()) counts.put(status, 0);
+        for (AttendanceRecord r : records) {
+            if (r.getDate().equals(today)) {
+                counts.merge(r.getStatus(), 1, Integer::sum);
+            }
+        }
+        return counts;
+    }
+
     public static int getNextStudentId() {
         int max = 0;
         for (Student s : students) {
@@ -577,14 +621,6 @@ public class DataManager {
             if (c.getClass_Id() > max) max = c.getClass_Id();
         }
         return max + 1;
-    }
-
-    public static int countTodayByStatus(AttendanceStatus status) {
-        int count = 0;
-        for (AttendanceRecord r : getTodayRecords()) {
-            if (r.getStatus() == status) count++;
-        }
-        return count;
     }
 
     public static Student findStudentById(int id) {

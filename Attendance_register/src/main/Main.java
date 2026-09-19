@@ -23,8 +23,19 @@ public class Main {
 		// LoginWindow는 JFrame이라 작업표시줄에 독립적으로 뜨며, 로그인 성공 시
 		// 콜백으로 이어서 데이터를 불러오고 MainFrame을 연다
 		LoginWindow loginWindow = new LoginWindow(() -> {
-			DataManager.loadAll(); // 로그인한 사용자의 데이터를 서버에서 불러오기
-			new MainFrame();
+			// 로그인한 사용자의 데이터를 서버에서 불러오는 동안(GET 4번) 화면이 멈춘 것처럼
+			// 굳어 보이지 않도록, 통신은 백그라운드 스레드에서 하고 끝난 뒤에만 메인 화면을 연다
+			new SwingWorker<Void, Void>() {
+				@Override
+				protected Void doInBackground() {
+					DataManager.loadAll();
+					return null;
+				}
+				@Override
+				protected void done() {
+					new MainFrame();
+				}
+			}.execute();
 		});
 		loginWindow.setVisible(true);
 	}

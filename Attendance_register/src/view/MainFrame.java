@@ -167,14 +167,52 @@ public class MainFrame extends JFrame{
 	
 	//현재 보고 있는 화면을 서버 최신 데이터로 갱신
 	private void refreshCurrentPanel() {
-		DataManager.loadAll(); //서버에서 데이터 다시 불러오기
-		switch (currentIdx) {
+		reloadDataAsync(() -> refreshPanel(currentIdx));
+	}
+
+	// idx에 해당하는 화면만 다시 그림 (서버 재조회는 하지 않음)
+	private void refreshPanel(int idx) {
+		switch (idx) {
 			case 0 -> dashboardPanel.refresh();
 			case 1 -> classPanel.refresh();
 			case 2 -> studentPanel.refresh();
 			case 3 -> attendancePanel.refresh();
 			case 4 -> calendarPanel.refresh();
 			case 5 -> excelPanel.refresh();
+		}
+	}
+
+	// true인 동안 서버 통신이 진행 중 -> 메뉴를 연타해도 loadAll()이 겹쳐 실행되며
+	// DataManager의 공유 리스트를 동시에 건드리는 일이 없도록 막는 용도
+	private boolean loading = false;
+
+	// DataManager.loadAll()(서버로 GET 4번)은 화면 전환/새로고침마다 호출되는데,
+	// 예전에는 이걸 EDT(화면을 그리는 스레드)에서 그대로 실행해서 응답이 올 때까지
+	// 창 전체가 멈춘 것처럼 굳어 있었음(특히 Render 무료 요금제는 첫 요청이 느림).
+	// SwingWorker로 백그라운드 스레드에서 통신하고, 끝난 뒤 결과만 EDT로 돌아와 반영함.
+	private void reloadDataAsync(Runnable afterLoad) {
+		if (loading) return;
+		loading = true;
+		setNavigationEnabled(false);
+		new SwingWorker<Void, Void>() {
+			@Override
+			protected Void doInBackground() {
+				DataManager.loadAll();
+				return null;
+			}
+			@Override
+			protected void done() {
+				loading = false;
+				setNavigationEnabled(true);
+				afterLoad.run();
+			}
+		}.execute();
+	}
+
+	// 데이터를 불러오는 동안 메뉴를 눌러 화면을 또 전환하지 못하게 막음
+	private void setNavigationEnabled(boolean enabled) {
+		for (JButton btn : menuButtons) {
+			btn.setEnabled(enabled);
 		}
 	}
 	
@@ -267,9 +305,8 @@ public class MainFrame extends JFrame{
 	    contentPanel.add(studentPanel,                "student");
 	    contentPanel.add(attendancePanel,             "attendance");
 	    contentPanel.add(calendarPanel, "calendar");
-	    contentPanel.add(new ExcelExportPanel(),        "excel");
 	    contentPanel.add(excelPanel, "excel");
-	    
+
 	    return contentPanel;
 	}
 	
@@ -287,18 +324,9 @@ public class MainFrame extends JFrame{
 			}
 		}
 		cardLayout.show(contentPanel,  CARD_KEYS[idx]); //메뉴에 해당되는 페이지 띄우기
-		
-		// 화면 전환 시 서버에서 최신 데이터를 다시 불러옴 (다른 기기에서 변경한 내용 반영)
-		DataManager.loadAll();
-		
-		 // 화면 전환 시 데이터 갱신
-	    switch (idx) { //인덱스 번호를 통해서 해당 화면 초기화
-	        case 0 -> dashboardPanel.refresh();
-	        case 1 -> classPanel.refresh();
-	        case 2 -> studentPanel.refresh();
-	        case 3 -> attendancePanel.refresh();
-	        case 4 -> calendarPanel.refresh();
-	        case 5 -> excelPanel.refresh();
-	    }
+
+		// 화면 전환 시 서버에서 최신 데이터를 다시 불러옴 (다른 기기에서 변경한 내용 반영).
+		// 통신은 백그라운드에서 하고, 끝나면 해당 화면만 갱신함 (아래 reloadDataAsync 참고)
+		reloadDataAsync(() -> refreshPanel(idx));
 	}
 }

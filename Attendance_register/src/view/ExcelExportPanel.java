@@ -93,21 +93,26 @@ public class ExcelExportPanel extends JPanel {
         dateRow.add(endSpinner);
 
         // 반 선택
-        JPanel classRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        // "반 선택"/"전체"는 왼쪽에 고정하고, 개별 반 체크박스 목록만 남는 공간을 채우도록
+        // BorderLayout으로 분리 (개별 체크박스 목록은 아래에서 스크롤 가능한 영역으로 감쌈)
+        JPanel classRow = new JPanel(new BorderLayout(10, 0));
         classRow.setBackground(WHITE);
         classRow.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+
+        JPanel classLeftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        classLeftPanel.setBackground(WHITE);
 
         JLabel classLabel = new JLabel("반 선택");
         classLabel.setFont(new Font("맑은 고딕", Font.BOLD, 12));
         classLabel.setForeground(new Color(17, 24, 39));
         classLabel.setPreferredSize(new Dimension(60, 32));
-        
+
         //모든 반 선택
         allClassCheck = new JCheckBox("전체");
         allClassCheck.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
         allClassCheck.setBackground(WHITE);
         allClassCheck.setSelected(true);
-        
+
         //클래스 선택확인 패널
         classCheckPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         classCheckPanel.setBackground(WHITE);
@@ -137,11 +142,28 @@ public class ExcelExportPanel extends JPanel {
                 ((JCheckBox) c).setSelected(selected);
             }
         });
-        
+
+        // 반 개수가 많거나 이름이 길어서 한 줄에 다 안 들어가면, 예전에는 넘치는
+        // 체크박스가 그냥 화면 밖으로 잘려서 안 보이는 버그가 있었음.
+        // 가로 스크롤(슬라이드) 가능한 영역으로 감싸서 옆으로 밀어보며 전부 접근 가능하게 함
+        JScrollPane classScrollPane = new JScrollPane(classCheckPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        classScrollPane.setBorder(null);
+        classScrollPane.setPreferredSize(new Dimension(400, 40));
+        classScrollPane.getViewport().setBackground(WHITE);
+        classScrollPane.getHorizontalScrollBar().setUnitIncrement(16);
+        // 세로 마우스 휠 동작을 가로 스크롤바 이동으로 그대로 이어줌 (세로 스크롤바가 없어서 기본으로는 휠이 안 먹힘)
+        classScrollPane.addMouseWheelListener(e -> {
+            JScrollBar hBar = classScrollPane.getHorizontalScrollBar();
+            hBar.setValue(hBar.getValue() + e.getWheelRotation() * hBar.getBlockIncrement());
+        });
+
         //클래스 선택 추가
-        classRow.add(classLabel);
-        classRow.add(allClassCheck);
-        classRow.add(classCheckPanel);
+        classLeftPanel.add(classLabel);
+        classLeftPanel.add(allClassCheck);
+        classRow.add(classLeftPanel, BorderLayout.WEST);
+        classRow.add(classScrollPane, BorderLayout.CENTER);
 
         panel.add(dateRow);
         panel.add(classRow);
