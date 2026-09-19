@@ -221,10 +221,17 @@ public class AttendanceInputPanel extends JPanel {
                     int btnWidth = cellRect.width / STATUSES.length;
                     int idx = cellX / btnWidth;
                     //선택이 라디오 중 하나일 경우, 상태를 해당하는 값으로 교채
+                    //(이미 선택된 상태를 다시 누르면 선택 취소 - 미선택 상태로 되돌림)
                     if (idx >= 0 && idx < STATUSES.length) {
                         int studentId = (int) tableModel.getValueAt(row, 0);
-                        tableModel.setValueAt(STATUSES[idx], row, 2);
-                        statusMap.put(studentId, STATUSES[idx]); // 맵에 저장
+                        String current = (String) tableModel.getValueAt(row, 2);
+                        if (STATUSES[idx].equals(current)) {
+                            tableModel.setValueAt(null, row, 2);
+                            statusMap.remove(studentId);
+                        } else {
+                            tableModel.setValueAt(STATUSES[idx], row, 2);
+                            statusMap.put(studentId, STATUSES[idx]); // 맵에 저장
+                        }
                         table.repaint();
                     }
                 }
@@ -277,7 +284,7 @@ public class AttendanceInputPanel extends JPanel {
         // 테이블 채우기
         for (Student s : DataManager.getStudent()) {
             if (s.getClass_Id() != selectedClass.getClass_Id()) continue;
-            String status = statusMap.getOrDefault(s.getStudent_id(), "출석"); //기본상태는 "출석"
+            String status = statusMap.get(s.getStudent_id()); //기본상태는 미선택(null) - 기존에 저장된 기록이 있을 때만 채워짐
             String reason = reasonMap.getOrDefault(s.getStudent_id(), ""); //기본상태는 빈칸
             tableModel.addRow(new Object[] {
                 s.getStudent_id(),
@@ -369,12 +376,14 @@ public class AttendanceInputPanel extends JPanel {
         // 테이블 편집 중인 셀 확인
         if (table.isEditing()) table.getCellEditor().stopCellEditing();
         
-        //각 열별로 출석 상태 저장
+        //각 열별로 출석 상태 저장 (출결 상태를 선택하지 않은 학생은 건너뜀)
         List<String> errors = new ArrayList<>();
+        int savedCount = 0;
         for (int row = 0; row < tableModel.getRowCount(); row++) {
             int studentId = (int) tableModel.getValueAt(row, 0);
             String studentName = (String) tableModel.getValueAt(row, 1);
             String statusStr = (String) tableModel.getValueAt(row, 2);
+            if (statusStr == null) continue; // 출결 상태를 선택하지 않은 학생은 저장 대상에서 제외
             String reason   = tableModel.getValueAt(row, 3) == null ? "" : tableModel.getValueAt(row, 3).toString(); //사유는 비어 있으면 ""을 저장
 
             // 출결 상태 문자열 → enum 변환
@@ -390,12 +399,17 @@ public class AttendanceInputPanel extends JPanel {
             String error = DataManager.updateRecord(studentId, date, status, reason);
             if (error != null) {
                 errors.add(studentName + ": " + error);
+            } else {
+                savedCount++;
             }
         }
 
         refreshTable(); // 실패한 항목은 저장 시도 전 상태로 되돌려져 있으므로 다시 반영
 
-        if (errors.isEmpty()) {
+        if (savedCount == 0 && errors.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                "출석 상태를 선택해주세요.", "알림", JOptionPane.INFORMATION_MESSAGE);
+        } else if (errors.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                 selectedClass.getClass_Name() + " 출석이 저장되었습니다.",
                 "저장 완료", JOptionPane.INFORMATION_MESSAGE);
