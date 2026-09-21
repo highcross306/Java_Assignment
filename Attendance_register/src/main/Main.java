@@ -1,5 +1,6 @@
 package main;
 
+import server.ServerLauncher;
 import view.LoginWindow;
 import view.MainFrame;
 import model.DataManager;
@@ -12,7 +13,44 @@ public class Main {
 			DataManager.saveAll();
 		}));
 
-		SwingUtilities.invokeLater(Main::startSession);
+		SwingUtilities.invokeLater(Main::startWithEmbeddedServer);
+	}
+
+	// 로그인 화면을 열기 전에, 이 PC 안에서 백엔드 서버(attendance-server)를 먼저
+	// 자식 프로세스로 띄우고 응답할 때까지 기다린다. Android 앱은 같은 와이파이 안에서
+	// 이 PC의 LAN 주소로 같은 서버에 접속한다 (MainFrame의 "Android 연결 정보" 참고).
+	private static void startWithEmbeddedServer() {
+		JWindow splash = new JWindow();
+		JLabel label = new JLabel("내장 서버 시작 중...", SwingConstants.CENTER);
+		label.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+		splash.add(label);
+		splash.pack();
+		splash.setLocationRelativeTo(null);
+		splash.setVisible(true);
+
+		new SwingWorker<String, Void>() {
+			@Override
+			protected String doInBackground() {
+				return ServerLauncher.start();
+			}
+			@Override
+			protected void done() {
+				splash.dispose();
+				String error;
+				try {
+					error = get();
+				} catch (Exception e) {
+					error = "내장 서버 시작 실패: " + e.getMessage();
+				}
+				if (error != null) {
+					JOptionPane.showMessageDialog(null, error, "내장 서버 시작 실패", JOptionPane.ERROR_MESSAGE);
+					System.exit(1);
+					return;
+				}
+				DataManager.setServerUrl("http://localhost:8080");
+				startSession();
+			}
+		}.execute();
 	}
 
 	// 로그인 화면 -> 메인 화면 진입까지의 한 번의 세션.

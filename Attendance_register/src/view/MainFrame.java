@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 import main.Main;
 import model.DataManager;
+import server.ServerLauncher;
 
 public class MainFrame extends JFrame{
 	//직렬화 아이디 선언(gui에서는 사용하지 않음)
@@ -111,6 +112,19 @@ public class MainFrame extends JFrame{
 		payTestBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 		payTestBtn.addActionListener(e -> togglePlanForTesting());
 
+		// Android 앱에서 이 PC에 접속할 때 입력해야 할 주소를 보여줌
+		JButton androidInfoBtn = new JButton("Android 연결 정보");
+		androidInfoBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		androidInfoBtn.setForeground(GRAY_TXT);
+		androidInfoBtn.setBackground(WHITE);
+		androidInfoBtn.setFocusPainted(false);
+		androidInfoBtn.setBorderPainted(true);
+		androidInfoBtn.setOpaque(true);
+		androidInfoBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		androidInfoBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		androidInfoBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		androidInfoBtn.addActionListener(e -> showAndroidConnectInfo());
+
 		JButton logoutBtn = new JButton("로그아웃");
 		logoutBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
 		logoutBtn.setForeground(GRAY_TXT);
@@ -128,8 +142,20 @@ public class MainFrame extends JFrame{
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(payTestBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
+		panel.add(androidInfoBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(logoutBtn);
 		return panel;
+	}
+
+	// Android 앱 로그인 화면의 "학원 서버 주소"란에 그대로 입력하면 되는 이 PC의 LAN 주소를 보여줌
+	private void showAndroidConnectInfo() {
+		String address = ServerLauncher.getLanAddressHint();
+		JOptionPane.showMessageDialog(this,
+				"같은 Wi-Fi에 연결된 Android 기기의 로그인 화면 '학원 서버 주소'란에\n"
+						+ "아래 주소를 입력하세요:\n\n" + address
+						+ "\n\n(이 PC와 Android 기기가 같은 Wi-Fi에 연결되어 있어야 합니다)",
+				"Android 연결 정보", JOptionPane.INFORMATION_MESSAGE);
 	}
 
 	// 결제 확인 비밀번호(테스트용 1234)를 입력받아 서버에 전달, DEMO <-> ACTIVE 전환 결과를 화면에 반영
