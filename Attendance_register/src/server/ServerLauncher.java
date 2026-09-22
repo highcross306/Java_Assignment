@@ -2,6 +2,8 @@ package server;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
@@ -9,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Enumeration;
 
@@ -64,12 +67,63 @@ public class ServerLauncher {
             return "내장 서버가 20초 안에 응답하지 않습니다. 로그를 확인해주세요: "
                     + new File(dataDir, "server.log").getAbsolutePath();
         }
+        startDiscoveryResponder();
         return null;
     }
 
     public static void stop() {
+        stopDiscoveryResponder();
         if (process != null) {
             process.destroy();
+        }
+    }
+
+    // Android 앱이 서버 주소를 직접 입력받지 않고 같은 와이파이 안에서 자동으로 찾을 수
+    // 있도록, UDP 브로드캐스트로 "ATTENDANCE_DISCOVER_V1" 질의가 오면 이 PC의 서버 포트를
+    // 알려주는 응답기. 멀티캐스트 대신 브로드캐스트를 쓴 건 Android에서 별도 권한
+    // (CHANGE_WIFI_MULTICAST_STATE)이 필요 없기 때문. 이 포트/문자열은 Android의
+    // network/ServerDiscovery.kt와 반드시 일치해야 함
+    private static final int DISCOVERY_PORT = 18081;
+    private static final String DISCOVERY_QUERY = "ATTENDANCE_DISCOVER_V1";
+    private static final String DISCOVERY_REPLY_PREFIX = "ATTENDANCE_SERVER_V1:";
+    private static DatagramSocket discoverySocket;
+    private static Thread discoveryThread;
+
+    private static void startDiscoveryResponder() {
+        try {
+            discoverySocket = new DatagramSocket(DISCOVERY_PORT);
+            discoverySocket.setBroadcast(true);
+        } catch (IOException e) {
+            // 발견 응답은 편의 기능일 뿐이라 실패해도 서버 자체는 계속 정상 동작해야 함
+            // (예: 이 포트가 이미 쓰이는 중이면 Android 쪽은 그냥 예전 방식대로 동작 못하게 됨)
+            System.err.println("자동 검색 응답 소켓을 열지 못했습니다: " + e.getMessage());
+            return;
+        }
+
+        discoveryThread = new Thread(() -> {
+            byte[] buffer = new byte[256];
+            while (!discoverySocket.isClosed()) {
+                try {
+                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                    discoverySocket.receive(packet);
+                    String received = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+                    if (DISCOVERY_QUERY.equals(received)) {
+                        byte[] replyBytes = (DISCOVERY_REPLY_PREFIX + PORT).getBytes(StandardCharsets.UTF_8);
+                        discoverySocket.send(new DatagramPacket(
+                                replyBytes, replyBytes.length, packet.getAddress(), packet.getPort()));
+                    }
+                } catch (IOException ignored) {
+                    // stop()에서 소켓을 닫으면 receive()가 예외를 던지며 루프가 자연히 끝남
+                }
+            }
+        }, "attendance-discovery-responder");
+        discoveryThread.setDaemon(true);
+        discoveryThread.start();
+    }
+
+    private static void stopDiscoveryResponder() {
+        if (discoverySocket != null) {
+            discoverySocket.close();
         }
     }
 
