@@ -21,8 +21,14 @@ import java.util.Enumeration;
 // 이 PC의 LAN 주소로 접속한다 (getLanAddressHint 참고).
 public class ServerLauncher {
 
-    private static final int PORT = 8080;
+    // 8080은 이 개발 PC에서 Hyper-V/WSL의 동적 포트 예약 범위(8064~8163)에 걸려서
+    // 아무 프로세스도 안 쓰는데도 bind가 거부되는 문제가 있었음 -> 18080으로 변경
+    private static final int PORT = 18080;
     private static Process process;
+
+    public static String getBaseUrl() {
+        return "http://localhost:" + PORT;
+    }
 
     public static boolean isRunning() {
         return process != null && process.isAlive();
@@ -110,21 +116,42 @@ public class ServerLauncher {
         return false;
     }
 
+    // VirtualBox/Hyper-V/VPN 소프트웨어가 깔린 PC에서는 이런 이름의 가상 어댑터도
+    // 사설 IP(192.168.x.x, 172.x.x.x)를 들고 있는 경우가 많음. Java의 isVirtual()은
+    // 이런 어댑터들을 걸러주지 못해서(Windows에서 전부 false로 나옴, 실제로 이 PC에서
+    // 확인함), 이름으로 직접 걸러야 진짜 와이파이/이더넷 주소를 안정적으로 찾을 수 있음
+    private static final String[] IGNORED_ADAPTER_KEYWORDS = {
+            "virtualbox", "vmware", "hyper-v", "docker", "wsl",
+            "zerotier", "hamachi", "tailscale", "loopback", "vpn", "teredo"
+    };
+
     // Android 앱 로그인 화면에 입력해줄, 같은 와이파이 안에서 이 PC를 가리키는 주소
     public static String getLanAddressHint() {
         try {
+            String fallback = null;
             Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
             while (ifaces.hasMoreElements()) {
                 NetworkInterface iface = ifaces.nextElement();
                 if (!iface.isUp() || iface.isLoopback() || iface.isVirtual()) continue;
+
+                String name = iface.getDisplayName() == null ? "" : iface.getDisplayName().toLowerCase();
+                boolean looksVirtual = false;
+                for (String keyword : IGNORED_ADAPTER_KEYWORDS) {
+                    if (name.contains(keyword)) { looksVirtual = true; break; }
+                }
+
                 Enumeration<InetAddress> addrs = iface.getInetAddresses();
                 while (addrs.hasMoreElements()) {
                     InetAddress addr = addrs.nextElement();
                     if (addr instanceof Inet4Address && addr.isSiteLocalAddress()) {
-                        return addr.getHostAddress() + ":" + PORT;
+                        if (!looksVirtual) return addr.getHostAddress() + ":" + PORT;
+                        if (fallback == null) fallback = addr.getHostAddress() + ":" + PORT;
                     }
                 }
             }
+            // 진짜 와이파이/이더넷으로 보이는 게 하나도 없으면(드묾), 그래도 가상 어댑터
+            // 주소라도 안내하는 게 아무것도 안 보여주는 것보다 나음
+            if (fallback != null) return fallback;
         } catch (Exception ignored) {
             // 아래 안내 문구로 대체
         }

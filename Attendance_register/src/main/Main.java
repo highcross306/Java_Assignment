@@ -47,7 +47,7 @@ public class Main {
 					System.exit(1);
 					return;
 				}
-				DataManager.setServerUrl("http://localhost:8080");
+				DataManager.setServerUrl(ServerLauncher.getBaseUrl());
 				startSession();
 			}
 		}.execute();
