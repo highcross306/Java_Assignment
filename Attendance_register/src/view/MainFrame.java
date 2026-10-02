@@ -125,6 +125,18 @@ public class MainFrame extends JFrame{
 		backupBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 		backupBtn.addActionListener(e -> showBackupMenu());
 
+		JButton licenseBtn = new JButton("라이선스 등록");
+		licenseBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		licenseBtn.setForeground(GRAY_TXT);
+		licenseBtn.setBackground(WHITE);
+		licenseBtn.setFocusPainted(false);
+		licenseBtn.setBorderPainted(false);
+		licenseBtn.setOpaque(true);
+		licenseBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		licenseBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		licenseBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		licenseBtn.addActionListener(e -> showLicenseDialog());
+
 		JButton logoutBtn = new JButton("로그아웃");
 		logoutBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
 		logoutBtn.setForeground(GRAY_TXT);
@@ -143,6 +155,8 @@ public class MainFrame extends JFrame{
 		panel.add(androidInfoBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(backupBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 4)));
+		panel.add(licenseBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(logoutBtn);
 		return panel;
@@ -205,6 +219,49 @@ public class MainFrame extends JFrame{
 			return;
 		}
 		System.exit(0);
+	}
+
+	// 현재 플랜 상태를 보여주고, 발급받은 라이선스 키(ATT-...)를 입력받아 활성화/연장
+	private void showLicenseDialog() {
+		JTextArea keyField = new JTextArea(4, 36);
+		keyField.setLineWrap(true);
+		keyField.setWrapStyleWord(false);
+
+		JPanel box = new JPanel(new BorderLayout(0, 8));
+		box.add(new JLabel("<html>" + describePlan() + "</html>"), BorderLayout.NORTH);
+		box.add(new JLabel("발급받은 라이선스 키를 붙여넣으세요:"), BorderLayout.CENTER);
+		JPanel input = new JPanel(new BorderLayout());
+		input.add(box, BorderLayout.NORTH);
+		input.add(new JScrollPane(keyField), BorderLayout.CENTER);
+
+		int result = JOptionPane.showConfirmDialog(this, input, "라이선스 등록",
+				JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+		if (result != JOptionPane.OK_OPTION) return;
+
+		String key = keyField.getText().trim();
+		if (key.isEmpty()) return;
+		String error = DataManager.activateLicense(key);
+		if (error != null) {
+			JOptionPane.showMessageDialog(this, error, "라이선스 등록 실패", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		JOptionPane.showMessageDialog(this, "<html>" + describePlan() + "</html>",
+				"라이선스 등록 완료", JOptionPane.INFORMATION_MESSAGE);
+		refreshCurrentPanel(); // 바뀐 제한값을 현재 화면에 즉시 반영
+	}
+
+	private String describePlan() {
+		java.time.LocalDate expires = DataManager.getLicenseExpiresAt();
+		String holder = DataManager.getLicenseHolder();
+		if (DataManager.isDemo()) {
+			String base = "현재 상태: <b>체험(DEMO)</b> - 반 " + DataManager.getMaxClasses() + "개, 학생 "
+					+ DataManager.getMaxStudents() + "명, 이번 달 출석만 가능";
+			if (expires != null) base += "<br><font color='red'>라이선스가 " + expires + "에 만료되었습니다.</font>";
+			return base;
+		}
+		if (expires == null) return "현재 상태: <b>정식(ACTIVE)</b> - 기한 없음";
+		return "현재 상태: <b>정식(ACTIVE)</b>" + (holder == null || holder.isEmpty() ? "" : " - " + holder)
+				+ "<br>라이선스 만료일: " + expires;
 	}
 
 	//로그아웃: 확인 후 변경사항을 저장하고, 이 창을 닫은 뒤 로그인 화면부터 다시 시작

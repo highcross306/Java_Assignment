@@ -170,11 +170,19 @@ public class DataManager {
     public static Integer getMaxStudents() { return maxStudents; }
     public static java.time.YearMonth getAllowedMonth() { return allowedMonth; }
 
+    // 라이선스로 활성화된 계정이면 만료일/등록된 학원 이름 (아니면 null). DEMO인데 만료일이 있으면 만료된 상태
+    private static java.time.LocalDate licenseExpiresAt = null;
+    private static String licenseHolder = null;
+    public static java.time.LocalDate getLicenseExpiresAt() { return licenseExpiresAt; }
+    public static String getLicenseHolder() { return licenseHolder; }
+
     private static void loadPlan() {
         planStatus = "ACTIVE";
         maxClasses = null;
         maxStudents = null;
         allowedMonth = null;
+        licenseExpiresAt = null;
+        licenseHolder = null;
         try {
             String body = httpGet("/me/plan");
             applyPlanJson(JsonParser.parseString(body).getAsJsonObject());
@@ -191,6 +199,23 @@ public class DataManager {
                 ? obj.get("maxStudents").getAsInt() : null;
         allowedMonth = (obj.has("allowedMonth") && !obj.get("allowedMonth").isJsonNull())
                 ? java.time.YearMonth.parse(obj.get("allowedMonth").getAsString()) : null;
+        licenseExpiresAt = (obj.has("licenseExpiresAt") && !obj.get("licenseExpiresAt").isJsonNull())
+                ? java.time.LocalDate.parse(obj.get("licenseExpiresAt").getAsString()) : null;
+        licenseHolder = (obj.has("licenseHolder") && !obj.get("licenseHolder").isJsonNull())
+                ? obj.get("licenseHolder").getAsString() : null;
+    }
+
+    // 라이선스 키로 이 계정을 ACTIVE로 전환(또는 연장). 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지
+    public static String activateLicense(String licenseKey) {
+        try {
+            JsonObject json = new JsonObject();
+            json.addProperty("licenseKey", licenseKey);
+            String body = httpPost("/me/plan/activate", json.toString());
+            applyPlanJson(JsonParser.parseString(body).getAsJsonObject());
+            return null;
+        } catch (Exception e) {
+            return friendlyMessage(e);
+        }
     }
 
     // 회원가입: 성공하면 바로 로그인된 상태가 됨 (서버가 가입과 동시에 토큰을 내려줌)
