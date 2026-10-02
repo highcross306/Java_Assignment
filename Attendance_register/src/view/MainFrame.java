@@ -162,13 +162,15 @@ public class MainFrame extends JFrame{
 		return panel;
 	}
 
-	// Android 앱 로그인 화면의 "학원 서버 주소"란에 그대로 입력하면 되는 이 PC의 LAN 주소를 보여줌
+	// Android 앱은 같은 Wi-Fi에서 이 PC를 자동으로 찾음. 자동 검색이 막히는 네트워크를 위해
+	// 앱의 [서버 주소 직접 입력]에 넣을 이 PC의 LAN 주소를 함께 보여줌
 	private void showAndroidConnectInfo() {
 		String address = ServerLauncher.getLanAddressHint();
 		JOptionPane.showMessageDialog(this,
-				"같은 Wi-Fi에 연결된 Android 기기의 로그인 화면 '학원 서버 주소'란에\n"
-						+ "아래 주소를 입력하세요:\n\n" + address
-						+ "\n\n(이 PC와 Android 기기가 같은 Wi-Fi에 연결되어 있어야 합니다)",
+				"같은 Wi-Fi에 연결된 Android 앱은 이 PC를 자동으로 찾습니다.\n"
+						+ "(이 프로그램이 켜져 있고, 같은 Wi-Fi여야 합니다)\n\n"
+						+ "자동으로 찾지 못하면 앱의 [서버 주소 직접 입력]에\n"
+						+ "아래 주소를 입력하세요:\n\n" + address,
 				"Android 연결 정보", JOptionPane.INFORMATION_MESSAGE);
 	}
 
