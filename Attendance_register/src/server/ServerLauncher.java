@@ -12,6 +12,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.time.Duration;
 import java.util.Enumeration;
 
@@ -28,6 +31,7 @@ public class ServerLauncher {
     // 아무 프로세스도 안 쓰는데도 bind가 거부되는 문제가 있었음 -> 18080으로 변경
     private static final int PORT = 18080;
     private static Process process;
+    private static BackupManager backups;
 
     public static int getPort() {
         return PORT;
@@ -57,11 +61,25 @@ public class ServerLauncher {
         File dataDir = new File(System.getProperty("user.home"), ".attendance-desktop");
         dataDir.mkdirs();
 
+        // 서버가 DB 파일을 열기 전에: 예약된 복원 적용 + 오늘 백업
+        backups = new BackupManager(dataDir);
+        backups.onStartup();
+
+        String jwtSecret;
+        try {
+            jwtSecret = loadOrCreateJwtSecret(dataDir);
+        } catch (IOException e) {
+            return "인증 키 파일을 만들지 못했습니다: " + e.getMessage();
+        }
+
         try {
             ProcessBuilder pb = new ProcessBuilder(
                     findJavaExecutable(), "-jar", jar.getAbsolutePath(),
                     "--spring.profiles.active=local");
             pb.directory(dataDir);
+            // 서버의 JWT 서명 키(application-local.properties의 jwt.secret)를 PC마다 다른
+            // 무작위 값으로 덮어씀. 고정 기본값이면 같은 Wi-Fi의 누구나 토큰을 위조할 수 있음
+            pb.environment().put("JWT_SECRET", jwtSecret);
             pb.redirectOutput(new File(dataDir, "server.log"));
             pb.redirectErrorStream(true);
             process = pb.start();
@@ -83,7 +101,40 @@ public class ServerLauncher {
         stopDiscoveryResponder();
         if (process != null) {
             process.destroy();
+            try {
+                // DB 파일이 닫힌 뒤에 백업해야 일관된 복사본이 됨
+                process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
+        if (backups != null) {
+            backups.onShutdown();
+        }
+    }
+
+    public static BackupManager getBackupManager() {
+        return backups;
+    }
+
+    // 처음 실행할 때 무작위 키를 만들어 dataDir/jwt.secret에 저장하고, 이후에는 그 값을 재사용
+    // (재사용하지 않으면 앱을 켤 때마다 발급된 토큰이 전부 무효가 되어 매번 재로그인해야 함)
+    private static String loadOrCreateJwtSecret(File dataDir) throws IOException {
+        File file = new File(dataDir, "jwt.secret");
+        if (file.isFile()) {
+            String existing = Files.readString(file.toPath(), StandardCharsets.UTF_8).trim();
+            if (existing.length() >= 32) return existing;
+        }
+        byte[] bytes = new byte[48];
+        new SecureRandom().nextBytes(bytes);
+        String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        Files.writeString(file.toPath(), secret, StandardCharsets.UTF_8);
+        // 다른 사용자 계정이 읽지 못하도록 최대한 제한 (Windows에서는 지원이 제한적이라 실패해도 무시)
+        file.setReadable(false, false);
+        file.setReadable(true, true);
+        file.setWritable(false, false);
+        file.setWritable(true, true);
+        return secret;
     }
 
     // Android 앱이 서버 주소를 직접 입력받지 않고 같은 와이파이 안에서 자동으로 찾을 수

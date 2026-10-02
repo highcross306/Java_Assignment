@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 import main.Main;
 import model.DataManager;
+import server.BackupManager;
 import server.ServerLauncher;
 
 public class MainFrame extends JFrame{
@@ -125,6 +126,18 @@ public class MainFrame extends JFrame{
 		androidInfoBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 		androidInfoBtn.addActionListener(e -> showAndroidConnectInfo());
 
+		JButton backupBtn = new JButton("데이터 백업/복원");
+		backupBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		backupBtn.setForeground(GRAY_TXT);
+		backupBtn.setBackground(WHITE);
+		backupBtn.setFocusPainted(false);
+		backupBtn.setBorderPainted(false);
+		backupBtn.setOpaque(true);
+		backupBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		backupBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		backupBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		backupBtn.addActionListener(e -> showBackupMenu());
+
 		JButton logoutBtn = new JButton("로그아웃");
 		logoutBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
 		logoutBtn.setForeground(GRAY_TXT);
@@ -144,6 +157,8 @@ public class MainFrame extends JFrame{
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(androidInfoBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
+		panel.add(backupBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(logoutBtn);
 		return panel;
 	}
@@ -156,6 +171,55 @@ public class MainFrame extends JFrame{
 						+ "아래 주소를 입력하세요:\n\n" + address
 						+ "\n\n(이 PC와 Android 기기가 같은 Wi-Fi에 연결되어 있어야 합니다)",
 				"Android 연결 정보", JOptionPane.INFORMATION_MESSAGE);
+	}
+
+	// 자동 백업(앱 시작/종료 시 하루 단위, 최근 14일)이 쌓이는 폴더를 열거나, 그중 하나로 복원을 예약.
+	// 복원은 DB 파일이 열려 있는 동안 바꿀 수 없어서 앱을 다시 시작할 때 적용된다
+	private void showBackupMenu() {
+		BackupManager backups = ServerLauncher.getBackupManager();
+		if (backups == null) {
+			JOptionPane.showMessageDialog(this, "백업 기능을 사용할 수 없습니다.", "데이터 백업/복원", JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		String[] options = {"백업 폴더 열기", "백업에서 복원", "닫기"};
+		int choice = JOptionPane.showOptionDialog(this,
+				"출석 데이터는 앱을 켜고 끌 때마다 자동으로 백업됩니다 (최근 14일).\n\n"
+						+ "백업 위치: " + backups.getBackupDir().getAbsolutePath(),
+				"데이터 백업/복원", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE,
+				null, options, options[0]);
+		if (choice == 0) {
+			try {
+				Desktop.getDesktop().open(backups.getBackupDir());
+			} catch (Exception ex) {
+				JOptionPane.showMessageDialog(this, "폴더를 열지 못했습니다: " + ex.getMessage(),
+						"데이터 백업/복원", JOptionPane.ERROR_MESSAGE);
+			}
+		} else if (choice == 1) {
+			restoreFromBackup(backups);
+		}
+	}
+
+	private void restoreFromBackup(BackupManager backups) {
+		JFileChooser chooser = new JFileChooser(backups.getBackupDir());
+		chooser.setDialogTitle("복원할 백업 파일 선택");
+		chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("백업 파일 (*.mv.db)", "db"));
+		if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+
+		int confirm = JOptionPane.showConfirmDialog(this,
+				"선택한 백업으로 현재 데이터를 되돌립니다.\n"
+						+ "(복원 직전의 현재 데이터도 백업 폴더에 따로 보관됩니다)\n\n"
+						+ "복원은 프로그램을 다시 시작할 때 적용됩니다. 지금 프로그램을 종료할까요?",
+				"데이터 복원", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+		if (confirm != JOptionPane.OK_OPTION) return;
+
+		try {
+			backups.scheduleRestore(chooser.getSelectedFile());
+		} catch (java.io.IOException ex) {
+			JOptionPane.showMessageDialog(this, "복원 예약 실패: " + ex.getMessage(),
+					"데이터 복원", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		System.exit(0);
 	}
 
 	// 결제 확인 비밀번호(테스트용 1234)를 입력받아 서버에 전달, DEMO <-> ACTIVE 전환 결과를 화면에 반영
