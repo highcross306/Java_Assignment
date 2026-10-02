@@ -32,6 +32,10 @@ public class SyncState {
     // 다음 시작 때 로컬을 무시하고 드라이브 데이터를 내려받도록 예약 (다른 PC에서 처음 연결할 때)
     public boolean pendingPull = false;
 
+    // 자동 동기화에 동의한 시각과 동의 문구의 버전 (문구가 바뀌면 버전을 올려서 다시 동의받을 수 있게 함)
+    public String consentAt = "";
+    public int consentVersion = 0;
+
     public String lastSyncTime = "";
     public String lastMessage = "";
 

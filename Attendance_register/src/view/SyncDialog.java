@@ -22,7 +22,18 @@ public final class SyncDialog {
     private final DriveSync sync;
     private final JDialog dialog;
     private final JLabel statusLabel = new JLabel();
-    private final JButton toggleButton = new JButton();
+    private final JButton toggleButton = new JButton("자동 동기화 허용");
+    private final JPanel consentPanel = new JPanel(new GridLayout(0, 1, 0, 4));
+    private final JCheckBox[] consents = {
+            new JCheckBox("<html><div style='width:330px'>학생 이름·연락처 등 <b>출석 데이터 전체가 암호화되어</b> 내 구글 드라이브의 "
+                    + "앱 전용 숨김 폴더에 저장되는 것에 동의합니다.</div></html>"),
+            new JCheckBox("<html><div style='width:330px'>프로그램을 켤 때와 끌 때 <b>자동으로 동기화</b>되며, 다른 PC와 동시에 바꾼 "
+                    + "경우 한쪽을 선택해야 함을 이해했습니다.</div></html>"),
+            new JCheckBox("<html><div style='width:330px'>동기화 비밀번호를 잊으면 드라이브의 데이터를 <b>복구할 수 없음</b>을 "
+                    + "이해했습니다.</div></html>"),
+            new JCheckBox("<html><div style='width:330px'>학생·보호자의 개인정보를 구글 서버에 저장하는 것에 대해 "
+                    + "필요한 안내와 동의를 받았음을 확인합니다.</div></html>")
+    };
 
     private SyncDialog(Component parent, GoogleAuth auth, DriveSync sync) {
         this.parent = parent;
@@ -59,6 +70,14 @@ public final class SyncDialog {
             else enableSync();
         });
 
+        // 동기화가 꺼져 있을 때만 보이는 동의 항목. 모두 체크해야 [자동 동기화 허용]이 눌린다
+        consentPanel.setBorder(BorderFactory.createEmptyBorder(8, 0, 12, 0));
+        for (JCheckBox box : consents) {
+            box.setFocusPainted(false);
+            box.addItemListener(e -> updateAllowButton());
+            consentPanel.add(box);
+        }
+
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         buttons.add(toggleButton);
         buttons.add(closeButton);
@@ -68,6 +87,7 @@ public final class SyncDialog {
         JPanel top = new JPanel(new BorderLayout());
         top.add(intro, BorderLayout.NORTH);
         top.add(statusLabel, BorderLayout.CENTER);
+        top.add(consentPanel, BorderLayout.SOUTH);
         content.add(top, BorderLayout.CENTER);
         content.add(buttons, BorderLayout.SOUTH);
 
@@ -80,19 +100,18 @@ public final class SyncDialog {
 
     private void refresh() {
         StringBuilder sb = new StringBuilder("<html><div style='width:360px'>");
-        if (!auth.isClientConfigured()) {
-            sb.append("<font color='#B91C1C'>구글 로그인 설정 파일(google-client.json)이 없어 사용할 수 없습니다.<br>")
-              .append("설치 폴더의 안내 문서(구글드라이브_동기화_설정.md)를 참고해 설정해주세요.</font>");
-            toggleButton.setEnabled(false);
-        } else if (sync.isEnabled()) {
-            sb.append("상태: <b>켜짐</b>");
+        boolean enabled = sync.isEnabled();
+        if (enabled) {
+            sb.append("상태: <b>자동 동기화 켜짐</b>");
             if (!sync.getAccountEmail().isEmpty()) sb.append(" (").append(escape(sync.getAccountEmail())).append(")");
-            toggleButton.setText("동기화 끄기");
-            toggleButton.setEnabled(true);
+            if (!sync.getConsentAt().isEmpty()) sb.append("<br><font color='#6B7280'>동의: ").append(escape(sync.getConsentAt())).append("</font>");
         } else {
-            sb.append("상태: <b>꺼짐</b>");
-            toggleButton.setText("구글 계정으로 동기화 켜기");
-            toggleButton.setEnabled(true);
+            sb.append("상태: <b>꺼짐</b> - 아래 내용에 모두 동의하면 [자동 동기화 허용]을 누를 수 있습니다.");
+        }
+        if (!auth.isClientConfigured()) {
+            sb.append("<br><font color='#B91C1C'>※ 구글 로그인 설정 파일(google-client.json)이 아직 없습니다. ")
+              .append("개발자 설정이 끝나기 전에는 허용해도 로그인할 수 없습니다. ")
+              .append("(설치 폴더의 구글드라이브_동기화_설정.md 참고)</font>");
         }
         if (!sync.getLastSyncTime().isEmpty()) {
             sb.append("<br><font color='#6B7280'>").append(escape(sync.getLastSyncTime())).append(" · ")
@@ -100,12 +119,40 @@ public final class SyncDialog {
         }
         sb.append("</div></html>");
         statusLabel.setText(sb.toString());
+
+        consentPanel.setVisible(!enabled);
+        toggleButton.setText(enabled ? "자동 동기화 끄기" : "자동 동기화 허용");
+        updateAllowButton();
         dialog.pack();
+    }
+
+    // 꺼져 있을 때: 동의 항목을 모두 체크해야 [허용] 가능. 켜져 있을 때: [끄기]는 항상 가능
+    private void updateAllowButton() {
+        if (sync.isEnabled()) {
+            toggleButton.setEnabled(true);
+            toggleButton.setToolTipText(null);
+            return;
+        }
+        boolean all = true;
+        for (JCheckBox box : consents) all &= box.isSelected();
+        toggleButton.setEnabled(all);
+        toggleButton.setToolTipText(all ? null : "동의 항목을 모두 체크해주세요");
     }
 
     // ---------------------------------------------------------------- 켜기
 
     private void enableSync() {
+        for (JCheckBox box : consents) {
+            if (!box.isSelected()) return; // 버튼이 비활성이라 오지 않지만, 동의 없이 켜지 않도록 한 번 더 확인
+        }
+        if (!auth.isClientConfigured()) {
+            JOptionPane.showMessageDialog(dialog,
+                    "구글 로그인 설정 파일(google-client.json)이 없어 지금은 연결할 수 없습니다." + NL
+                            + "개발자 설정(구글드라이브_동기화_설정.md)을 마친 뒤 다시 시도해주세요.",
+                    "구글 드라이브 동기화", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        sync.markConsentGiven();
         busy("브라우저에서 구글 로그인을 완료해주세요...");
         runAsync(() -> {
             if (!auth.isSignedIn()) auth.signIn();
@@ -217,6 +264,7 @@ public final class SyncDialog {
                 "동기화 끄기", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.OK_OPTION) return;
         sync.disable();
         auth.signOut();
+        for (JCheckBox box : consents) box.setSelected(false);
         refresh();
     }
 

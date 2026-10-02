@@ -73,6 +73,16 @@ public class DriveSync {
     public synchronized String getAccountEmail() { return state.accountEmail; }
     public synchronized String getLastMessage() { return state.lastMessage; }
     public synchronized String getLastSyncTime() { return state.lastSyncTime; }
+    public synchronized String getConsentAt() { return state.consentAt; }
+
+    public static final int CONSENT_VERSION = 1;
+    private String pendingConsentAt = "";
+
+    // 설정 화면에서 동의 항목을 모두 체크하고 [허용]을 눌렀을 때 호출. 실제로 동기화가 켜지는 시점(applyKey)에
+    // 함께 저장되므로, 로그인이나 비밀번호 입력을 중간에 취소하면 동의도 기록되지 않는다
+    public synchronized void markConsentGiven() {
+        pendingConsentAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
 
     // ---------------------------------------------------------------- 시작/종료 시 자동 동기화
 
@@ -239,6 +249,8 @@ public class DriveSync {
         state.saltBase64 = "";
         state.pendingPull = false;
         state.accountEmail = "";
+        state.consentAt = "";
+        state.consentVersion = 0;
         note("동기화를 해제했습니다 (드라이브의 데이터는 그대로 남아 있습니다)");
     }
 
@@ -248,6 +260,11 @@ public class DriveSync {
         state.keyBase64 = Base64.getEncoder().encodeToString(key);
         state.accountEmail = email == null ? "" : email;
         state.enabled = true;
+        if (!pendingConsentAt.isEmpty()) {
+            state.consentAt = pendingConsentAt;
+            state.consentVersion = CONSENT_VERSION;
+            pendingConsentAt = "";
+        }
     }
 
     // ---------------------------------------------------------------- 공통
