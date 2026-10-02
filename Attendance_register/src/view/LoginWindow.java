@@ -22,7 +22,6 @@ public class LoginWindow extends JFrame {
 
     private final Runnable onLoginSuccess;
 
-    private final JTextField serverUrlField = new JTextField(16);
     private final JTextField usernameField = new JTextField(16);
     private final JPasswordField passwordField = new PlaceholderPasswordField(16, "비밀번호는 8자 이상이어야 합니다");
     private final JCheckBox rememberCheckBox = new JCheckBox("내 정보 기억");
@@ -48,15 +47,7 @@ public class LoginWindow extends JFrame {
         form.setOpaque(false);
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         form.setBorder(BorderFactory.createEmptyBorder(20, 0, 8, 0));
-        // 학원마다 자기 서버를 따로 운영하므로, 이전에 접속했던 서버 주소가 있으면 미리 채워줌
-        if (DataManager.isServerConfigured()) {
-            serverUrlField.setText(DataManager.getServerUrl()
-                    .replaceFirst("^https?://", "")
-                    .replaceFirst("/api$", ""));
-        }
-
-        form.add(labeled("학원 서버 주소", serverUrlField));
-        form.add(Box.createRigidArea(new Dimension(0, 10)));
+        // 서버 주소는 입력받지 않음: 이 PC 안의 내장 서버(Main이 시작 시 자동 설정)에 접속한다
         form.add(labeled("아이디", usernameField));
         form.add(Box.createRigidArea(new Dimension(0, 10)));
         form.add(labeled("비밀번호", passwordFieldWithToggle()));
@@ -173,15 +164,9 @@ public class LoginWindow extends JFrame {
     }
 
     private void attempt(boolean isLogin) {
-        String serverUrl = serverUrlField.getText().trim();
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword());
 
-        if (serverUrl.isEmpty()) {
-            messageLabel.setForeground(RED);
-            messageLabel.setText("학원 서버 주소를 입력해주세요");
-            return;
-        }
         if (username.isEmpty() || password.isEmpty()) {
             messageLabel.setForeground(RED);
             messageLabel.setText("아이디와 비밀번호를 입력해주세요");
@@ -194,20 +179,6 @@ public class LoginWindow extends JFrame {
             messageLabel.setText("비밀번호는 8자 이상이어야 합니다");
             return;
         }
-
-        if (isInsecureNonLocalUrl(serverUrl)) {
-            int choice = JOptionPane.showConfirmDialog(this,
-                    "암호화되지 않은 연결(http://)입니다. 로그인 정보와 학생 개인정보가\n" +
-                            "전송 구간에서 노출될 수 있습니다. 학원 서버 주소가 https://로\n" +
-                            "시작하는지 다시 확인하는 것을 권장합니다.\n\n그래도 계속 진행하시겠습니까?",
-                    "보안 경고", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-            if (choice != JOptionPane.YES_OPTION) {
-                return;
-            }
-        }
-
-        // 서버 주소가 바뀌었을 수도 있으니 매 시도마다 최신 입력값으로 저장함
-        DataManager.setServerUrl(serverUrl);
 
         messageLabel.setForeground(GRAY_TXT);
         messageLabel.setText(isLogin ? "로그인 중..." : "회원가입 중...");
@@ -229,17 +200,6 @@ public class LoginWindow extends JFrame {
                 }
             });
         }).start();
-    }
-
-    // 로컬 개발 서버(localhost/127.0.0.1)는 예외적으로 허용하고, 그 외의
-    // http:// 주소만 경고 대상으로 삼음
-    private boolean isInsecureNonLocalUrl(String input) {
-        String lower = input.trim().toLowerCase();
-        if (!lower.startsWith("http://")) {
-            return false;
-        }
-        String host = lower.substring("http://".length());
-        return !(host.startsWith("localhost") || host.startsWith("127.0.0.1"));
     }
 
     // JPasswordField는 HTML input의 placeholder 같은 기능이 없어서, 비어있고
