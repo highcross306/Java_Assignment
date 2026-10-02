@@ -38,6 +38,8 @@ public class GoogleAuth implements DriveClient.TokenProvider {
     public static final String SCOPE = "openid email https://www.googleapis.com/auth/drive.appdata";
 
     private final File tokenFile;
+    // 사용자가 화면에서 입력한 값을 저장하는 곳 (이 PC의 사용자 데이터 폴더)
+    private final File userClientConfig;
     private final File[] clientConfigCandidates;
     private final String authEndpoint;
     private final String tokenEndpoint;
@@ -64,6 +66,7 @@ public class GoogleAuth implements DriveClient.TokenProvider {
     // 시험용: 엔드포인트를 가짜 서버로 바꿔서 흐름을 검증할 수 있게 함
     GoogleAuth(File appDataDir, String authEndpoint, String tokenEndpoint, File... clientConfigCandidates) {
         this.tokenFile = new File(appDataDir, "google-token.json");
+        this.userClientConfig = new File(appDataDir, "google-client.json");
         this.authEndpoint = authEndpoint;
         this.tokenEndpoint = tokenEndpoint;
         this.clientConfigCandidates = clientConfigCandidates;
@@ -71,9 +74,67 @@ public class GoogleAuth implements DriveClient.TokenProvider {
         loadToken();
     }
 
-    // 클라이언트 ID가 배포돼 있어야 로그인을 시작할 수 있음 (없으면 설정 화면에서 안내)
+    // 클라이언트 ID가 있어야 로그인을 시작할 수 있음 (없으면 설정 화면에서 입력받음)
     public boolean isClientConfigured() {
         return clientId != null && !clientId.isBlank();
+    }
+
+    // ---------------------------------------------------------------- 클라이언트 설정(google-client.json) 만들기
+
+    // 사용자가 화면에서 입력한 클라이언트 ID/보안 비밀로 google-client.json을 만들어 저장하고 바로 적용한다.
+    // (이 두 값은 구글 클라우드 콘솔에서 발급받는 값이라 프로그램이 대신 만들 수는 없고, 입력받아 저장만 한다.)
+    // 값이 올바르지 않으면 사용자에게 보여줄 메시지의 IOException
+    public void configureClient(String id, String secret) throws IOException {
+        String newId = id == null ? "" : id.trim();
+        String newSecret = secret == null ? "" : secret.trim();
+        String error = validateClientValues(newId, newSecret);
+        if (error != null) throw new IOException(error);
+
+        JsonObject json = new JsonObject();
+        json.addProperty("client_id", newId);
+        json.addProperty("client_secret", newSecret);
+        File tmp = new File(userClientConfig.getPath() + ".tmp");
+        Files.writeString(tmp.toPath(), json.toString(), StandardCharsets.UTF_8);
+        Files.move(tmp.toPath(), userClientConfig.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        userClientConfig.setReadable(false, false);
+        userClientConfig.setReadable(true, true);
+
+        // 다른 클라이언트로 바꾸면 이전 클라이언트가 발급한 로그인 정보는 쓸 수 없으므로 지움 (다시 로그인 필요)
+        boolean changed = clientId != null && !clientId.isEmpty() && !clientId.equals(newId);
+        clientId = newId;
+        clientSecret = newSecret;
+        if (changed && isSignedIn()) signOut();
+    }
+
+    // 구글 클라우드 콘솔에서 내려받은 JSON 파일({"installed": {...}})에서 클라이언트 ID/보안 비밀을 읽어옴 -> {id, secret}
+    public static String[] readClientFile(File file) throws IOException {
+        try {
+            JsonObject root = JsonParser.parseString(Files.readString(file.toPath(), StandardCharsets.UTF_8)).getAsJsonObject();
+            JsonObject cfg = root.has("installed") ? root.getAsJsonObject("installed") : root;
+            if (!cfg.has("client_id")) {
+                if (root.has("web")) {
+                    throw new IOException("'웹 애플리케이션' 유형으로 만든 클라이언트입니다. '데스크톱 앱' 유형으로 다시 만들어주세요.");
+                }
+                throw new IOException("클라이언트 ID가 들어 있지 않은 파일입니다.");
+            }
+            return new String[] { cfg.get("client_id").getAsString(),
+                    cfg.has("client_secret") ? cfg.get("client_secret").getAsString() : "" };
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("구글 클라우드 콘솔에서 내려받은 JSON 파일이 아닙니다.");
+        }
+    }
+
+    // 입력값 검사: 문제가 있으면 사용자에게 보여줄 메시지, 없으면 null
+    public static String validateClientValues(String id, String secret) {
+        if (id == null || id.isEmpty()) return "클라이언트 ID를 입력해주세요.";
+        if (id.chars().anyMatch(Character::isWhitespace) || !id.endsWith(".apps.googleusercontent.com") || id.length() < 30) {
+            return "클라이언트 ID 형식이 올바르지 않습니다. (예: 123456789-abcdef.apps.googleusercontent.com)";
+        }
+        if (secret == null || secret.isEmpty()) return "클라이언트 보안 비밀(Client secret)을 입력해주세요.";
+        if (secret.chars().anyMatch(Character::isWhitespace)) return "클라이언트 보안 비밀에 공백이 들어 있습니다.";
+        return null;
     }
 
     public boolean isSignedIn() {

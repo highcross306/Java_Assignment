@@ -123,9 +123,8 @@ public final class SyncDialog {
         reloginButton.setVisible(needsRelogin);
         reloginButton.setEnabled(true);
         if (!auth.isClientConfigured()) {
-            sb.append("<br><font color='#B91C1C'>※ 구글 로그인 설정 파일(google-client.json)이 아직 없습니다. ")
-              .append("개발자 설정이 끝나기 전에는 허용해도 로그인할 수 없습니다. ")
-              .append("(설치 폴더의 구글드라이브_동기화_설정.md 참고)</font>");
+            sb.append("<br><font color='#1D4ED8'>※ 처음 한 번, 구글 로그인 설정값(클라이언트 ID)이 필요합니다. ")
+              .append("[자동 동기화 허용]을 누르면 입력창이 나오고, 입력한 값으로 설정 파일(google-client.json)이 자동으로 만들어집니다.</font>");
         }
         if (!sync.getLastSyncTime().isEmpty()) {
             sb.append("<br><font color='#6B7280'>").append(escape(sync.getLastSyncTime())).append(" · ")
@@ -153,18 +152,100 @@ public final class SyncDialog {
         toggleButton.setToolTipText(all ? null : "동의 항목을 모두 체크해주세요");
     }
 
+    // ---------------------------------------------------------------- 구글 로그인 설정값 입력
+
+    // 구글 로그인 설정(클라이언트 ID/보안 비밀)이 없으면 입력창을 띄워서 받고, 입력값으로 google-client.json을
+    // 만들어 저장한다. 이미 있으면 아무것도 묻지 않고 true. 사용자가 취소하면 false
+    private boolean ensureClientConfigured() {
+        if (auth.isClientConfigured()) return true;
+
+        ClientConfigForm form = new ClientConfigForm(dialog);
+        while (true) {
+            int choice = JOptionPane.showConfirmDialog(dialog, form, "구글 로그인 설정 입력",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (choice != JOptionPane.OK_OPTION) {
+                refresh();
+                return false;
+            }
+            try {
+                auth.configureClient(form.id(), form.secret());
+                refresh();
+                return true;
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(dialog, e.getMessage(), "입력값 확인", JOptionPane.WARNING_MESSAGE);
+                // 입력한 값은 그대로 두고 다시 묻는다
+            }
+        }
+    }
+
+    // 클라이언트 ID/보안 비밀 입력 양식. 구글 콘솔을 열어주는 버튼과, 콘솔에서 내려받은 JSON 파일을
+    // 불러와서 두 칸을 자동으로 채워주는 버튼이 있다
+    static final class ClientConfigForm extends JPanel {
+        private final JTextField idField = new JTextField(34);
+        private final JTextField secretField = new JTextField(34);
+
+        ClientConfigForm(Component owner) {
+            super(new BorderLayout(0, 8));
+            JLabel help = new JLabel("<html><div style='width:400px'>"
+                    + "구글 드라이브 동기화에는 <b>구글 클라우드 콘솔</b>에서 만든 <b>OAuth 클라이언트</b>"
+                    + "(유형: <b>데스크톱 앱</b>)의 값이 한 번 필요합니다.<br>"
+                    + "만드는 방법은 설치 폴더의 <b>구글드라이브_동기화_설정.md</b>에 있습니다. "
+                    + "JSON 파일을 내려받았다면 [JSON 파일 불러오기]로 아래 두 칸을 자동으로 채울 수 있습니다."
+                    + "</div></html>");
+
+            JButton consoleButton = new JButton("구글 콘솔 열기");
+            consoleButton.addActionListener(e -> {
+                try {
+                    Desktop.getDesktop().browse(java.net.URI.create("https://console.cloud.google.com/apis/credentials"));
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(owner, "브라우저를 열 수 없습니다. 주소: https://console.cloud.google.com/apis/credentials",
+                            "구글 콘솔", JOptionPane.WARNING_MESSAGE);
+                }
+            });
+            JButton importButton = new JButton("JSON 파일 불러오기");
+            importButton.addActionListener(e -> importJson(owner));
+            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+            buttons.add(consoleButton);
+            buttons.add(importButton);
+
+            JPanel fields = new JPanel(new GridLayout(0, 1, 0, 4));
+            fields.add(new JLabel("클라이언트 ID"));
+            fields.add(idField);
+            fields.add(new JLabel("클라이언트 보안 비밀 (Client secret)"));
+            fields.add(secretField);
+
+            add(help, BorderLayout.NORTH);
+            JPanel center = new JPanel(new BorderLayout(0, 8));
+            center.add(buttons, BorderLayout.NORTH);
+            center.add(fields, BorderLayout.CENTER);
+            add(center, BorderLayout.CENTER);
+        }
+
+        String id() { return idField.getText(); }
+        String secret() { return secretField.getText(); }
+
+        private void importJson(Component owner) {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("구글 클라우드 콘솔에서 내려받은 JSON 파일 선택");
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("JSON 파일 (*.json)", "json"));
+            if (chooser.showOpenDialog(owner) != JFileChooser.APPROVE_OPTION) return;
+            try {
+                String[] values = GoogleAuth.readClientFile(chooser.getSelectedFile());
+                idField.setText(values[0]);
+                secretField.setText(values[1]);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(owner, ex.getMessage(), "JSON 파일 불러오기", JOptionPane.WARNING_MESSAGE);
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- 다시 로그인
 
     // 로그인 정보만 새로 받는다. 동기화 비밀번호/암호화 키/버전 정보는 건드리지 않으므로 처음 켤 때의
     // 동의·비밀번호 입력을 다시 하지 않아도 되고, 이전에 올린 데이터와 이어서 동기화된다.
     // 처음 동기화를 켠 계정과 다른 계정으로 로그인하면 그 데이터를 쓸 수 없으므로 거부한다
     private void relogin() {
-        if (!auth.isClientConfigured()) {
-            JOptionPane.showMessageDialog(dialog,
-                    "구글 로그인 설정 파일(google-client.json)이 없어 지금은 로그인할 수 없습니다.",
-                    "구글 드라이브 동기화", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
+        if (!ensureClientConfigured()) return;
         busy("브라우저에서 구글 로그인을 완료해주세요...");
         runAsync(() -> {
             sync.relogin(auth);
@@ -183,13 +264,7 @@ public final class SyncDialog {
         for (JCheckBox box : consents) {
             if (!box.isSelected()) return; // 버튼이 비활성이라 오지 않지만, 동의 없이 켜지 않도록 한 번 더 확인
         }
-        if (!auth.isClientConfigured()) {
-            JOptionPane.showMessageDialog(dialog,
-                    "구글 로그인 설정 파일(google-client.json)이 없어 지금은 연결할 수 없습니다." + NL
-                            + "개발자 설정(구글드라이브_동기화_설정.md)을 마친 뒤 다시 시도해주세요.",
-                    "구글 드라이브 동기화", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
+        if (!ensureClientConfigured()) return; // 설정값이 없으면 여기서 입력받아 google-client.json을 만든다
         sync.markConsentGiven();
         busy("브라우저에서 구글 로그인을 완료해주세요...");
         runAsync(() -> {
