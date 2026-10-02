@@ -1,5 +1,6 @@
 package main;
 
+import server.FirewallSetup;
 import server.ServerLauncher;
 import view.LoginWindow;
 import view.MainFrame;
@@ -48,9 +49,26 @@ public class Main {
 					return;
 				}
 				DataManager.setServerUrl(ServerLauncher.getBaseUrl());
+				ensureFirewall();
 				startSession();
 			}
 		}.execute();
+	}
+
+	// Android 앱이 이 PC에 접속하려면 방화벽 허용 규칙이 필요함. 없으면 관리자 권한 요청이
+	// 한 번 뜬다고 먼저 안내한 뒤 등록하고, 거부/실패해도 PC 쪽 사용은 막지 않고 경고만 한다
+	private static void ensureFirewall() {
+		if (FirewallSetup.isConfigured()) return;
+		JOptionPane.showMessageDialog(null,
+				"Android 앱이 이 PC에 연결하려면 Windows 방화벽 허용이 필요합니다.\n"
+				+ "곧 나오는 '관리자 권한 요청'에서 [예]를 눌러주세요. (처음 한 번만 필요합니다)",
+				"방화벽 설정", JOptionPane.INFORMATION_MESSAGE);
+		if (!FirewallSetup.configure(ServerLauncher.getPort(), ServerLauncher.getDiscoveryPort())) {
+			JOptionPane.showMessageDialog(null,
+					"방화벽 허용이 완료되지 않았습니다. Android 앱에서 이 PC를 찾지 못할 수 있습니다.\n"
+					+ "앱을 다시 실행해서 [예]를 누르거나, 관리자 권한으로 한 번 실행해주세요.",
+					"방화벽 설정 실패", JOptionPane.WARNING_MESSAGE);
+		}
 	}
 
 	// 로그인 화면 -> 메인 화면 진입까지의 한 번의 세션.

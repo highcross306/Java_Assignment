@@ -9,3 +9,5 @@ bin/
 *.log
 *.tmp
 *.lock
+dist/
+build/

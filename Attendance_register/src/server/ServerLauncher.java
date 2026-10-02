@@ -29,6 +29,14 @@ public class ServerLauncher {
     private static final int PORT = 18080;
     private static Process process;
 
+    public static int getPort() {
+        return PORT;
+    }
+
+    public static int getDiscoveryPort() {
+        return DISCOVERY_PORT;
+    }
+
     public static String getBaseUrl() {
         return "http://localhost:" + PORT;
     }
@@ -51,7 +59,7 @@ public class ServerLauncher {
 
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                    "java", "-jar", jar.getAbsolutePath(),
+                    findJavaExecutable(), "-jar", jar.getAbsolutePath(),
                     "--spring.profiles.active=local");
             pb.directory(dataDir);
             pb.redirectOutput(new File(dataDir, "server.log"));
@@ -127,9 +135,9 @@ public class ServerLauncher {
         }
     }
 
-    // jar 위치를 찾는 순서: 실행 시 직접 지정한 경로 -> 앱과 같은 폴더의 server/ 하위
-    // (나중에 실제 배포판을 만들 때 이 자리에 jar를 함께 넣어두면 됨) -> 지금 이 개발
-    // 환경에서 백엔드 저장소가 있는 고정 경로(개발 편의용)
+    // 서버 jar 위치를 찾는 순서: 실행 시 직접 지정한 경로(개발용) -> 앱 설치 폴더 기준
+    // server/attendance-server.jar (배포판에 같이 들어있음). 작업 디렉터리(cwd)는 바로가기로
+    // 실행하면 달라질 수 있어서, 앱 자신의 위치(jar/클래스 경로)를 기준으로 찾는다
     private static File findServerJar() {
         String override = System.getProperty("attendance.server.jar");
         if (override != null) {
@@ -137,13 +145,37 @@ public class ServerLauncher {
             if (f.isFile()) return f;
         }
 
-        File bundled = new File("server/attendance-server.jar");
-        if (bundled.isFile()) return bundled;
-
-        File devJar = new File("C:/Attendance_Server/attendance-server/target/attendance-server-1.0.0.jar");
-        if (devJar.isFile()) return devJar;
-
+        File appDir = getAppDir();
+        File[] candidates = {
+                new File(appDir, "server/attendance-server.jar"),
+                new File(appDir.getParentFile() == null ? appDir : appDir.getParentFile(),
+                        "server/attendance-server.jar"),
+                new File("server/attendance-server.jar")
+        };
+        for (File candidate : candidates) {
+            if (candidate.isFile()) return candidate;
+        }
         return null;
+    }
+
+    // 이 앱이 실행 중인 폴더. jar로 실행되면 그 jar가 있는 폴더, Eclipse처럼 클래스 폴더로
+    // 실행되면 그 클래스 폴더(bin)
+    private static File getAppDir() {
+        try {
+            File location = new File(ServerLauncher.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI());
+            return location.isFile() ? location.getParentFile() : location;
+        } catch (Exception e) {
+            return new File(".").getAbsoluteFile();
+        }
+    }
+
+    // PATH의 "java"에 의존하면 Java가 따로 설치돼 있지 않은 PC(런타임을 포함한 설치본
+    // 사용 시)에서 실패하므로, 지금 이 앱을 실행 중인 JVM의 java를 그대로 사용한다
+    private static String findJavaExecutable() {
+        String exe = System.getProperty("os.name").toLowerCase().contains("win") ? "java.exe" : "java";
+        File f = new File(System.getProperty("java.home"), "bin" + File.separator + exe);
+        return f.isFile() ? f.getAbsolutePath() : "java";
     }
 
     private static boolean waitUntilHealthy(Duration timeout) {
