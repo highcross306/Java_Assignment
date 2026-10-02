@@ -12,6 +12,8 @@ public class Main {
 		// 종료 방식에 상관없이 항상 저장(종료 시 thread를 생성)
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			DataManager.saveAll();
+			// 서버가 살아 있어야 저장이 되므로, 저장이 끝난 뒤에 서버를 종료(+백업)
+			ServerLauncher.stop();
 		}));
 
 		SwingUtilities.invokeLater(Main::startWithEmbeddedServer);

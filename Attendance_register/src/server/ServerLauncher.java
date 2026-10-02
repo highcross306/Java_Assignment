@@ -32,6 +32,8 @@ public class ServerLauncher {
     private static final int PORT = 18080;
     private static Process process;
     private static BackupManager backups;
+    private static boolean stopped = false;
+    private static final String NL = System.lineSeparator();
 
     public static int getPort() {
         return PORT;
@@ -61,6 +63,11 @@ public class ServerLauncher {
         File dataDir = new File(System.getProperty("user.home"), ".attendance-desktop");
         dataDir.mkdirs();
 
+        // 이전 실행에서 남은 서버가 포트를 잡고 있으면 새 서버가 뜨지 못하는데, 그 잔존 서버가
+        // /api/health에는 응답하므로 "성공"으로 오판하게 됨 -> 먼저 정리하고, 못 하면 원인을 알려줌
+        String portError = ensurePortAvailable();
+        if (portError != null) return portError;
+
         // 서버가 DB 파일을 열기 전에: 예약된 복원 적용 + 오늘 백업
         backups = new BackupManager(dataDir);
         backups.onStartup();
@@ -80,6 +87,9 @@ public class ServerLauncher {
             // 서버의 JWT 서명 키(application-local.properties의 jwt.secret)를 PC마다 다른
             // 무작위 값으로 덮어씀. 고정 기본값이면 같은 Wi-Fi의 누구나 토큰을 위조할 수 있음
             pb.environment().put("JWT_SECRET", jwtSecret);
+            // 이 앱이 강제 종료돼도 서버가 포트를 붙잡은 채 남지 않도록, 서버가 이 PID를 감시하다가
+            // 사라지면 스스로 종료함 (서버 쪽 ParentProcessWatcher)
+            pb.environment().put("ATTENDANCE_PARENT_PID", String.valueOf(ProcessHandle.current().pid()));
             pb.redirectOutput(new File(dataDir, "server.log"));
             pb.redirectErrorStream(true);
             process = pb.start();
@@ -87,17 +97,23 @@ public class ServerLauncher {
             return "내장 서버 실행 실패: " + e.getMessage();
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(ServerLauncher::stop));
+        // 종료 시 stop()은 Main의 종료 훅이 "데이터 저장 -> 서버 종료" 순서로 직접 호출함
+        // (여기서 따로 훅을 등록하면 저장보다 서버가 먼저 꺼질 수 있음)
 
-        if (!waitUntilHealthy(Duration.ofSeconds(20))) {
-            return "내장 서버가 20초 안에 응답하지 않습니다. 로그를 확인해주세요: "
-                    + new File(dataDir, "server.log").getAbsolutePath();
+        File log = new File(dataDir, "server.log");
+        if (!waitUntilHealthy(process, Duration.ofSeconds(30))) {
+            if (!process.isAlive()) {
+                return "내장 서버가 시작 직후 종료되었습니다. 로그를 확인해주세요:" + NL + log.getAbsolutePath();
+            }
+            return "내장 서버가 30초 안에 응답하지 않습니다. 로그를 확인해주세요:" + NL + log.getAbsolutePath();
         }
         startDiscoveryResponder();
         return null;
     }
 
-    public static void stop() {
+    public static synchronized void stop() {
+        if (stopped) return;
+        stopped = true;
         stopDiscoveryResponder();
         if (process != null) {
             process.destroy();
@@ -111,6 +127,88 @@ public class ServerLauncher {
         if (backups != null) {
             backups.onShutdown();
         }
+    }
+
+    // 18080을 쓸 수 있는 상태로 만든다. 이전 실행에서 남은 attendance-server가 잡고 있으면 종료시키고,
+    // 다른 프로그램이 잡고 있거나 Windows가 예약한 포트면 사용자에게 원인을 알린다. 성공하면 null
+    private static String ensurePortAvailable() {
+        if (isPortFree()) return null;
+
+        long pid = findListeningPid();
+        if (pid > 0) {
+            ProcessHandle owner = ProcessHandle.of(pid).orElse(null);
+            String command = owner == null ? "" : commandLineOf(pid);
+            if (owner != null && command.contains("attendance-server")) {
+                owner.destroy();
+                if (!waitForPortFree(5000)) {
+                    owner.destroyForcibly();
+                    waitForPortFree(5000);
+                }
+            }
+        }
+        if (isPortFree()) return null;
+
+        if (pid > 0) {
+            return "포트 " + PORT + "을(를) 다른 프로그램(PID " + pid + ")이 사용 중입니다." + NL
+                    + "그 프로그램을 종료한 뒤 다시 실행해주세요.";
+        }
+        return "포트 " + PORT + "을(를) 사용할 수 없습니다." + NL
+                + "(Windows가 이 포트를 예약했을 수 있습니다. 관리자에게 문의해주세요.)";
+    }
+
+    // Windows에서는 Java의 ProcessHandle.info().commandLine()이 다른 프로세스에 대해 비어 있는 경우가 많아서
+    // (실제로 확인함) PowerShell의 CIM 조회로 명령줄을 가져옴. 실패하면 빈 문자열
+    private static String commandLineOf(long pid) {
+        try {
+            Process p = new ProcessBuilder("powershell", "-NoProfile", "-Command",
+                    "(Get-CimInstance Win32_Process -Filter 'ProcessId=" + pid + "').CommandLine")
+                    .redirectErrorStream(true).start();
+            String out = new String(p.getInputStream().readAllBytes());
+            p.waitFor();
+            return out.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static boolean isPortFree() {
+        try (java.net.ServerSocket probe = new java.net.ServerSocket(PORT)) {
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static boolean waitForPortFree(long millis) {
+        long deadline = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < deadline) {
+            if (isPortFree()) return true;
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return isPortFree();
+    }
+
+    // netstat 출력에서 PORT를 LISTENING 중인 프로세스의 PID를 찾음 (못 찾으면 -1)
+    private static long findListeningPid() {
+        try {
+            Process p = new ProcessBuilder("netstat", "-ano", "-p", "tcp").redirectErrorStream(true).start();
+            String out = new String(p.getInputStream().readAllBytes());
+            p.waitFor();
+            for (String line : out.split(NL)) {
+                String[] cols = line.trim().split("\\s+");
+                if (cols.length >= 5 && cols[3].equalsIgnoreCase("LISTENING") && cols[1].endsWith(":" + PORT)) {
+                    return Long.parseLong(cols[4]);
+                }
+            }
+        } catch (Exception ignored) {
+            // 찾지 못하면 -1 -> 호출한 쪽에서 일반 메시지로 대체
+        }
+        return -1;
     }
 
     public static BackupManager getBackupManager() {
@@ -229,10 +327,12 @@ public class ServerLauncher {
         return f.isFile() ? f.getAbsolutePath() : "java";
     }
 
-    private static boolean waitUntilHealthy(Duration timeout) {
+    private static boolean waitUntilHealthy(Process child, Duration timeout) {
         HttpClient client = HttpClient.newHttpClient();
         long deadline = System.currentTimeMillis() + timeout.toMillis();
         while (System.currentTimeMillis() < deadline) {
+            // 우리가 띄운 자식이 이미 죽었다면(포트 충돌 등) 다른 프로세스가 응답하더라도 성공이 아님
+            if (!child.isAlive()) return false;
             try {
                 HttpRequest req = HttpRequest.newBuilder()
                         .uri(URI.create("http://localhost:" + PORT + "/api/health"))
