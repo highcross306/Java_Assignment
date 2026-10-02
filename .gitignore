@@ -11,3 +11,6 @@ bin/
 *.lock
 dist/
 build/
+
+# 구글 OAuth 클라이언트 설정(배포용 파일, 저장소에는 올리지 않음)
+google-client.json

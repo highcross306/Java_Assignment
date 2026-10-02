@@ -125,6 +125,18 @@ public class MainFrame extends JFrame{
 		backupBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 		backupBtn.addActionListener(e -> showBackupMenu());
 
+		JButton syncBtn = new JButton("구글 드라이브 동기화");
+		syncBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+		syncBtn.setForeground(GRAY_TXT);
+		syncBtn.setBackground(WHITE);
+		syncBtn.setFocusPainted(false);
+		syncBtn.setBorderPainted(false);
+		syncBtn.setOpaque(true);
+		syncBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		syncBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		syncBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		syncBtn.addActionListener(e -> SyncDialog.show(this));
+
 		JButton licenseBtn = new JButton("라이선스 등록");
 		licenseBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
 		licenseBtn.setForeground(GRAY_TXT);
@@ -155,6 +167,8 @@ public class MainFrame extends JFrame{
 		panel.add(androidInfoBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(backupBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 4)));
+		panel.add(syncBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		panel.add(licenseBtn);
 		panel.add(Box.createRigidArea(new Dimension(0, 4)));

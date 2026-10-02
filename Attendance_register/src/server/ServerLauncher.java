@@ -17,6 +17,11 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.time.Duration;
 import java.util.Enumeration;
+import sync.DbFingerprint;
+import sync.DriveClient;
+import sync.DriveSync;
+import sync.GoogleAuth;
+import sync.SwingSyncUi;
 
 // 예전에는 각 학원이 Postgres+Spring Boot 백엔드를 Render/Northflank 같은 클라우드에
 // 직접 배포해서 운영해야 했는데, 이 과정(DB 계정 생성, 환경변수 설정, 슬립 문제 대응 등)이
@@ -33,6 +38,8 @@ public class ServerLauncher {
     private static Process process;
     private static BackupManager backups;
     private static boolean stopped = false;
+    private static GoogleAuth googleAuth;
+    private static DriveSync driveSync;
     private static final String NL = System.lineSeparator();
 
     public static int getPort() {
@@ -68,8 +75,18 @@ public class ServerLauncher {
         String portError = ensurePortAvailable();
         if (portError != null) return portError;
 
-        // 서버가 DB 파일을 열기 전에: 예약된 복원 적용 + 오늘 백업
+        // 서버가 DB 파일을 열기 전에: (동기화를 켠 경우) 드라이브의 최신 데이터 받기 -> 예약된 복원 적용 + 오늘 백업.
+        // 동기화 실패(오프라인 등)는 앱 실행을 막지 않고 상태 메시지로만 남는다
         backups = new BackupManager(dataDir);
+        File appDir = getAppDir();
+        googleAuth = new GoogleAuth(dataDir,
+                new File(appDir, "google-client.json"),
+                new File(appDir.getParentFile() == null ? appDir : appDir.getParentFile(), "google-client.json"),
+                new File(dataDir, "google-client.json"));
+        driveSync = new DriveSync(dataDir, () -> new DriveClient(googleAuth),
+                new SwingSyncUi(), name -> backups.snapshot(name),
+                file -> DbFingerprint.compute(file, findH2Jar(), findJavaExecutable()));
+        driveSync.beforeServerStart();
         backups.onStartup();
 
         String jwtSecret;
@@ -124,9 +141,22 @@ public class ServerLauncher {
                 Thread.currentThread().interrupt();
             }
         }
+        boolean serverStopped = process == null || !process.isAlive();
         if (backups != null) {
             backups.onShutdown();
         }
+        // 서버가 아직 DB를 잡고 있으면 파일이 일관되지 않을 수 있으므로 업로드하지 않음
+        if (driveSync != null && serverStopped) {
+            driveSync.afterServerStop();
+        }
+    }
+
+    public static GoogleAuth getGoogleAuth() {
+        return googleAuth;
+    }
+
+    public static DriveSync getDriveSync() {
+        return driveSync;
     }
 
     // 18080을 쓸 수 있는 상태로 만든다. 이전 실행에서 남은 attendance-server가 잡고 있으면 종료시키고,
@@ -307,9 +337,18 @@ public class ServerLauncher {
         return null;
     }
 
+    // 동기화가 "DB 내용이 바뀌었는지" 비교할 때 쓰는 H2 도구 jar (서버 jar 안에 들어 있는 것과 같은 버전을
+    // 배포본의 server/h2.jar로 함께 넣어둠). 개발 중에는 -Dattendance.h2.jar=경로 로 지정
+    private static File findH2Jar() {
+        String override = System.getProperty("attendance.h2.jar");
+        if (override != null) return new File(override);
+        File serverJar = findServerJar();
+        return serverJar == null ? null : new File(serverJar.getParentFile(), "h2.jar");
+    }
+
     // 이 앱이 실행 중인 폴더. jar로 실행되면 그 jar가 있는 폴더, Eclipse처럼 클래스 폴더로
     // 실행되면 그 클래스 폴더(bin)
-    private static File getAppDir() {
+    public static File getAppDir() {
         try {
             File location = new File(ServerLauncher.class.getProtectionDomain()
                     .getCodeSource().getLocation().toURI());

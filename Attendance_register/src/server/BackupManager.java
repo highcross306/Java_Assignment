@@ -18,6 +18,7 @@ import java.util.Comparator;
 public class BackupManager {
 
     private static final int KEEP_DAYS = 14;
+    private static final int KEEP_SAFETY = 10;
     private static final String DB_NAME = "attendance.mv.db";
     private static final String PENDING_RESTORE = "restore-pending.mv.db";
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -72,6 +73,11 @@ public class BackupManager {
         }
     }
 
+    // 다른 기능(드라이브 동기화)이 로컬 DB를 교체하기 전에 현재 상태를 보관할 때 사용
+    public void snapshot(String fileName) {
+        backupNow(fileName);
+    }
+
     private void backupNow(String fileName) {
         if (!dbFile.isFile()) return;
         try {
@@ -89,13 +95,18 @@ public class BackupManager {
         return "attendance-" + day.format(DAY) + ".mv.db";
     }
 
-    // 일 단위 백업은 최근 KEEP_DAYS개만 남김 (이름의 날짜순 = 시간순)
+    // 일 단위 백업은 최근 KEEP_DAYS개만, "교체 직전 보관본"(before-restore-*, before-sync-*)은
+    // 최근 KEEP_SAFETY개만 남김 (이름의 날짜순 = 시간순)
     private void prune() {
-        File[] daily = backupDir.listFiles((d, n) -> n.matches("attendance-\\d{8}\\.mv\\.db"));
-        if (daily == null || daily.length <= KEEP_DAYS) return;
-        Arrays.sort(daily, Comparator.comparing(File::getName));
-        for (int i = 0; i < daily.length - KEEP_DAYS; i++) {
-            daily[i].delete();
+        keepNewest(backupDir.listFiles((d, n) -> n.matches("attendance-\\d{8}\\.mv\\.db")), KEEP_DAYS);
+        keepNewest(backupDir.listFiles((d, n) -> n.matches("before-(restore|sync)-.*\\.mv\\.db")), KEEP_SAFETY);
+    }
+
+    private static void keepNewest(File[] files, int keep) {
+        if (files == null || files.length <= keep) return;
+        Arrays.sort(files, Comparator.comparing(File::getName));
+        for (int i = 0; i < files.length - keep; i++) {
+            files[i].delete();
         }
     }
 }
