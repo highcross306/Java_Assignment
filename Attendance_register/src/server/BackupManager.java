@@ -12,8 +12,11 @@ import java.util.Comparator;
 
 // 출석 데이터는 이 PC의 H2 파일(data/attendance.mv.db) 하나뿐이라, PC 고장이나 파일 손상이
 // 나면 복구할 방법이 없음. 서버가 꺼져 있어서 파일이 안정된 시점(앱 시작 직전, 종료 직후)에
-// 하루 단위로 복사본을 남기고 오래된 것은 지운다. 같은 날 여러 번 켜고 꺼도 그날의
-// 마지막 상태 하나만 남음. 복원은 앱이 켜지기 전에만 안전하므로, 복원을 예약해두고
+// 하루 단위로 복사본을 남기고 오래된 것은 지운다. 하루마다 두 개를 따로 둔다:
+//   attendance-날짜-start.mv.db : 그날 처음 켜기 직전의 상태 (= 어제 마지막 상태). 한 번 만들면 덮어쓰지 않음
+//   attendance-날짜.mv.db       : 그날의 가장 최근 상태 (끌 때마다 덮어씀)
+// 둘을 나누는 이유: 그날 DB가 손상되면 "가장 최근" 파일도 손상된 상태로 덮어써지는데, 그래도 그날 처음의
+// 정상 상태는 start 파일에 남기 위함. 복원은 앱이 켜지기 전에만 안전하므로, 복원을 예약해두고
 // 다음 시작 때 적용한다 (현재 데이터는 복원 직전에 따로 보관)
 public class BackupManager {
 
@@ -38,15 +41,20 @@ public class BackupManager {
         return backupDir;
     }
 
-    // 서버를 띄우기 직전에 호출: 예약된 복원이 있으면 적용하고, 그 다음 오늘 백업이 없으면 만든다
+    // 서버를 띄우기 직전에 호출: 예약된 복원이 있으면 적용하고, 오늘의 "처음 상태" 백업이 없으면 만든다
+    // ("가장 최근" 백업이 아직 없으면 그것도 함께 만들어서, 끄기 전에 문제가 생겨도 오늘 파일이 하나는 있게 함)
     public void onStartup() {
         applyPendingRestore();
-        if (!new File(backupDir, dayFileName(LocalDate.now())).isFile()) {
-            backupNow(dayFileName(LocalDate.now()));
+        LocalDate today = LocalDate.now();
+        if (!new File(backupDir, startFileName(today)).isFile()) {
+            backupNow(startFileName(today));
+        }
+        if (!new File(backupDir, dayFileName(today)).isFile()) {
+            backupNow(dayFileName(today));
         }
     }
 
-    // 서버를 끈 직후에 호출: 오늘 백업을 이 시점의 최종 상태로 덮어씀
+    // 서버를 끈 직후에 호출: 오늘의 "가장 최근" 백업을 이 시점의 최종 상태로 덮어씀 (처음 상태 백업은 건드리지 않음)
     public void onShutdown() {
         backupNow(dayFileName(LocalDate.now()));
     }
@@ -95,10 +103,15 @@ public class BackupManager {
         return "attendance-" + day.format(DAY) + ".mv.db";
     }
 
+    private static String startFileName(LocalDate day) {
+        return "attendance-" + day.format(DAY) + "-start.mv.db";
+    }
+
     // 일 단위 백업은 최근 KEEP_DAYS개만, "교체 직전 보관본"(before-restore-*, before-sync-*)은
     // 최근 KEEP_SAFETY개만 남김 (이름의 날짜순 = 시간순)
     private void prune() {
         keepNewest(backupDir.listFiles((d, n) -> n.matches("attendance-\\d{8}\\.mv\\.db")), KEEP_DAYS);
+        keepNewest(backupDir.listFiles((d, n) -> n.matches("attendance-\\d{8}-start\\.mv\\.db")), KEEP_DAYS);
         keepNewest(backupDir.listFiles((d, n) -> n.matches("before-(restore|sync)-.*\\.mv\\.db")), KEEP_SAFETY);
     }
 

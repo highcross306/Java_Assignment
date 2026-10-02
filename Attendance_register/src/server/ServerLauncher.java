@@ -38,6 +38,8 @@ public class ServerLauncher {
     private static Process process;
     private static BackupManager backups;
     private static boolean stopped = false;
+    private static SessionGuard sessionGuard; // 이 실행이 세션을 소유한 경우에만 non-null (중복 실행이면 null)
+    private static boolean sessionRunning = false; // markRunning까지 마쳤는지 (정상 종료 표시의 전제)
     private static GoogleAuth googleAuth;
     private static DriveSync driveSync;
     private static final String NL = System.lineSeparator();
@@ -70,6 +72,21 @@ public class ServerLauncher {
         File dataDir = new File(System.getProperty("user.home"), ".attendance-desktop");
         dataDir.mkdirs();
 
+        // 이미 실행 중인 프로그램이 있으면 여기서 멈춘다. 이 확인이 없으면 아래의 "남은 서버 정리"가 실행 중인
+        // 프로그램의 서버를 종료시켜서, 먼저 켜 둔 창이 서버 없이 남게 된다 (실제로 확인함)
+        SessionGuard guard = new SessionGuard(dataDir);
+        SessionGuard.Result session;
+        try {
+            session = guard.acquire();
+        } catch (IOException e) {
+            return "실행 상태를 확인하지 못했습니다: " + e.getMessage();
+        }
+        if (session == SessionGuard.Result.ALREADY_RUNNING) {
+            return "출석 관리 프로그램이 이미 실행 중입니다." + NL
+                    + "열려 있는 창을 사용하거나, 그 창을 닫은 뒤 다시 실행해주세요.";
+        }
+        sessionGuard = guard;
+
         // 이전 실행에서 남은 서버가 포트를 잡고 있으면 새 서버가 뜨지 못하는데, 그 잔존 서버가
         // /api/health에는 응답하므로 "성공"으로 오판하게 됨 -> 먼저 정리하고, 못 하면 원인을 알려줌
         String portError = ensurePortAvailable();
@@ -86,8 +103,24 @@ public class ServerLauncher {
         driveSync = new DriveSync(dataDir, () -> new DriveClient(googleAuth),
                 new SwingSyncUi(), name -> backups.snapshot(name),
                 file -> DbFingerprint.compute(file, findH2Jar(), findJavaExecutable()));
+
+        // 지난 실행이 강제 종료/정전 등으로 끝났다면 종료 때 했어야 할 일(마지막 상태 백업, 변경 내용 드라이브 업로드)을
+        // 건너뛴 것이므로 지금 대신 한다. 서버는 위에서 정리됐고 아직 새로 띄우기 전이라 DB 파일이 닫혀 있다.
+        // 업로드는 드라이브가 그 사이 바뀌지 않았을 때만 되고, 바뀌었다면 아래 시작 시 동기화에서 충돌로 처리됨
+        if (session == SessionGuard.Result.PREVIOUS_EXIT_UNCLEAN) {
+            System.err.println("지난 실행이 정상 종료되지 않아 종료 절차(백업, 동기화)를 지금 수행합니다");
+            backups.onShutdown();
+            driveSync.afterServerStop();
+        }
         driveSync.beforeServerStart();
         backups.onStartup();
+
+        try {
+            sessionGuard.markRunning(); // 이 시점부터 DB가 바뀔 수 있음. 정상 종료 절차를 마치면 stop()이 지움
+            sessionRunning = true;
+        } catch (IOException e) {
+            return "실행 상태를 기록하지 못했습니다: " + e.getMessage();
+        }
 
         String jwtSecret;
         try {
@@ -142,12 +175,20 @@ public class ServerLauncher {
             }
         }
         boolean serverStopped = process == null || !process.isAlive();
-        if (backups != null) {
-            backups.onShutdown();
-        }
-        // 서버가 아직 DB를 잡고 있으면 파일이 일관되지 않을 수 있으므로 업로드하지 않음
-        if (driveSync != null && serverStopped) {
-            driveSync.afterServerStop();
+        // 서버가 아직 DB를 잡고 있으면 파일이 일관되지 않을 수 있으므로 백업/업로드를 하지 않고,
+        // "정상 종료" 표시도 하지 않는다 -> 다음 실행 때 건너뛴 종료 절차를 대신 수행함
+        if (serverStopped) {
+            if (backups != null) {
+                backups.onShutdown();
+            }
+            if (driveSync != null) {
+                driveSync.afterServerStop();
+            }
+            // 복구 절차를 거쳐 markRunning까지 간 실행만 "정상 종료"로 기록한다. 그 전에 시작이 실패했다면
+            // (포트 충돌 등) 지난번의 비정상 종료 흔적을 지우면 안 되므로 그대로 둔다
+            if (sessionGuard != null && sessionRunning) {
+                sessionGuard.markClean();
+            }
         }
     }
 

@@ -46,7 +46,7 @@ public class Main {
 					error = "내장 서버 시작 실패: " + e.getMessage();
 				}
 				if (error != null) {
-					JOptionPane.showMessageDialog(null, error, "내장 서버 시작 실패", JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog(null, error, "프로그램을 시작할 수 없습니다", JOptionPane.ERROR_MESSAGE);
 					System.exit(1);
 					return;
 				}
