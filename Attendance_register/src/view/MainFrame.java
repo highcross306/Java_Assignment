@@ -3,6 +3,7 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import main.AppLifecycle;
 import main.Main;
 import model.DataManager;
 import server.BackupManager;
@@ -40,7 +41,7 @@ public class MainFrame extends JFrame{
 
 	public MainFrame() {
 		super("학원 출석 관리 프로그램");
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		AppLifecycle.register(this); // [X]를 누르면 "백그라운드로 실행 / 완전히 종료" 선택 (종료하면 종료 훅이 저장/백업 수행)
 		setSize(1100, 700);
 		setLayout(new BorderLayout(0, 0));
 		setBackground(BG);
@@ -50,13 +51,6 @@ public class MainFrame extends JFrame{
 		
 		switchCard(0);
 		
-		// 창 닫기 버튼 클릭 시 저장 후 종료
-		addWindowListener(new WindowAdapter() {
-			@Override
-			public void windowClosing(WindowEvent e) {
-				System.exit(0); // ShutdownHook → saveAll() 자동 호출
-			}
-		});
 		
 		setLocationRelativeTo(null); //null->모니터 화면 정중앙에 배치
 		setVisible(true);
@@ -123,6 +117,7 @@ public class MainFrame extends JFrame{
 		JMenuItem syncItem = settingsItem("구글 드라이브 동기화", e -> SyncDialog.show(this));
 		settingsMenu.add(syncItem);
 		settingsMenu.add(settingsItem("라이선스 등록", e -> showLicenseDialog()));
+		settingsMenu.add(settingsItem("닫기 버튼 동작", e -> AppLifecycle.showClosePreferenceDialog(this)));
 		settingsMenu.addSeparator();
 		settingsMenu.add(settingsItem("로그아웃", e -> logout()));
 

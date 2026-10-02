@@ -1,5 +1,6 @@
 package view;
 
+import main.AppLifecycle;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.Ellipse2D;
@@ -31,8 +32,9 @@ public class LoginWindow extends JFrame {
         super("학원 출석 관리 프로그램 - 로그인");
         this.onLoginSuccess = onLoginSuccess;
         setResizable(false);
-        // 로그인하지 않고 창을 닫으면(작업표시줄 우클릭 닫기 포함) 프로그램 자체를 종료
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // 창을 닫으면(작업표시줄 우클릭 닫기 포함) 바로 끝내지 않고 "백그라운드로 실행 / 완전히 종료"를 고르게 함
+        // (서버가 이 프로그램 안에서 돌기 때문에, 창만 숨기면 Android 앱이 계속 연결할 수 있음)
+        AppLifecycle.register(this);
 
         JPanel content = new JPanel();
         content.setBackground(BG);

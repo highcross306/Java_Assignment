@@ -44,6 +44,18 @@ public class ServerLauncher {
     private static DriveSync driveSync;
     private static final String NL = System.lineSeparator();
 
+    private static boolean alreadyRunning = false;
+
+    // start()가 "이미 실행 중인 프로그램이 있어서" 실패한 것인지 (그 경우 오류 대신 실행 중인 창을 불러오면 됨)
+    public static boolean wasAlreadyRunning() {
+        return alreadyRunning;
+    }
+
+    // 이 프로그램의 사용자 데이터 폴더 (DB, 백업, 설정 파일들이 있는 곳)
+    public static File getDataDir() {
+        return new File(System.getProperty("user.home"), ".attendance-desktop");
+    }
+
     public static int getPort() {
         return PORT;
     }
@@ -82,6 +94,7 @@ public class ServerLauncher {
             return "실행 상태를 확인하지 못했습니다: " + e.getMessage();
         }
         if (session == SessionGuard.Result.ALREADY_RUNNING) {
+            alreadyRunning = true;
             return "출석 관리 프로그램이 이미 실행 중입니다." + NL
                     + "열려 있는 창을 사용하거나, 그 창을 닫은 뒤 다시 실행해주세요.";
         }

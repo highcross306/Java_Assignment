@@ -46,11 +46,18 @@ public class Main {
 					error = "내장 서버 시작 실패: " + e.getMessage();
 				}
 				if (error != null) {
+					if (ServerLauncher.wasAlreadyRunning()) {
+						// 이미 실행 중(창이 숨겨져 있을 수도 있음): 오류를 띄우지 않고 실행 중인 창을 불러온 뒤 조용히 끝낸다
+						AppLifecycle.requestShow();
+						System.exit(0);
+						return;
+					}
 					JOptionPane.showMessageDialog(null, error, "프로그램을 시작할 수 없습니다", JOptionPane.ERROR_MESSAGE);
 					System.exit(1);
 					return;
 				}
 				DataManager.setServerUrl(ServerLauncher.getBaseUrl());
+				AppLifecycle.startSignalWatcher(); // 숨겨진 상태에서 프로그램을 또 실행하면 창을 다시 보여줌
 				startSession(); // 로그인 화면은 방화벽 점검을 기다리지 않고 바로 띄움
 				ensureFirewallAsync();
 			}
