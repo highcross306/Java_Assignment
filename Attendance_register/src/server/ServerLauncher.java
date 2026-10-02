@@ -34,7 +34,8 @@ public class ServerLauncher {
 
     // 8080은 이 개발 PC에서 Hyper-V/WSL의 동적 포트 예약 범위(8064~8163)에 걸려서
     // 아무 프로세스도 안 쓰는데도 bind가 거부되는 문제가 있었음 -> 18080으로 변경
-    private static final int PORT = 18080;
+    private static final int DEFAULT_PORT = 18080;
+    private static final int PORT = loadConfiguredPort();
     private static Process process;
     private static BackupManager backups;
     private static boolean stopped = false;
@@ -54,6 +55,23 @@ public class ServerLauncher {
     // 이 프로그램의 사용자 데이터 폴더 (DB, 백업, 설정 파일들이 있는 곳)
     public static File getDataDir() {
         return new File(System.getProperty("user.home"), ".attendance-desktop");
+    }
+
+    // 서버 포트: ~/.attendance-desktop/settings.properties의 server.port (설치 프로그램이 기본 포트(18080)를 쓸 수 없는
+    // PC - Hyper-V/WSL이 예약했거나 다른 프로그램이 사용 중 - 에서 다른 포트를 골라 적어둠). 없거나 올바르지 않으면 18080
+    private static int loadConfiguredPort() {
+        File file = new File(System.getProperty("user.home"), ".attendance-desktop" + File.separator + "settings.properties");
+        if (file.isFile()) {
+            try (java.io.Reader in = new java.io.InputStreamReader(new java.io.FileInputStream(file), StandardCharsets.UTF_8)) {
+                java.util.Properties p = new java.util.Properties();
+                p.load(in);
+                int port = Integer.parseInt(p.getProperty("server.port", "").trim());
+                if (port >= 1024 && port <= 65535) return port;
+            } catch (Exception ignored) {
+                // 못 읽거나 숫자가 아니면 기본 포트
+            }
+        }
+        return DEFAULT_PORT;
     }
 
     public static int getPort() {
@@ -150,6 +168,7 @@ public class ServerLauncher {
             // 서버의 JWT 서명 키(application-local.properties의 jwt.secret)를 PC마다 다른
             // 무작위 값으로 덮어씀. 고정 기본값이면 같은 Wi-Fi의 누구나 토큰을 위조할 수 있음
             pb.environment().put("JWT_SECRET", jwtSecret);
+            pb.environment().put("PORT", String.valueOf(PORT)); // 서버의 server.port=${PORT:18080}
             // 이 앱이 강제 종료돼도 서버가 포트를 붙잡은 채 남지 않도록, 서버가 이 PID를 감시하다가
             // 사라지면 스스로 종료함 (서버 쪽 ParentProcessWatcher)
             pb.environment().put("ATTENDANCE_PARENT_PID", String.valueOf(ProcessHandle.current().pid()));

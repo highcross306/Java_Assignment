@@ -33,6 +33,12 @@ public final class AppLifecycle {
     private static final String PREF_FILE = "ui-prefs.properties";
     private static final String PREF_KEY = "close.action"; // ask | hide | exit
     private static final String SHOW_SIGNAL_FILE = "show.signal";
+    // 설치 프로그램이 업데이트/제거 전에 실행 중인 프로그램을 정상 종료(저장, 백업, 동기화 포함)시키려고 만드는 신호
+    private static final String EXIT_SIGNAL_FILE = "exit.signal";
+
+    // 이 프로그램(JVM)이 시작된 시각. 파일 시각의 정밀도(초 단위로 내려가는 파일 시스템)를 감안해 1초 여유를 둠
+    private static final long STARTED_AT_MILLIS = ProcessHandle.current().info().startInstant()
+            .map(java.time.Instant::toEpochMilli).orElse(System.currentTimeMillis()) - 1000;
 
     private static JFrame current;
     private static TrayIcon trayIcon;
@@ -153,6 +159,13 @@ public final class AppLifecycle {
         });
     }
 
+    // 자동 실행(--background) 때 사용: 방금 띄운 창을 바로 숨김
+    public static void hideCurrent() {
+        SwingUtilities.invokeLater(() -> {
+            if (current != null) hide(current);
+        });
+    }
+
     static void exit() {
         removeTray();
         exitAction.run();
@@ -229,12 +242,22 @@ public final class AppLifecycle {
     public static void startSignalWatcher() {
         if (signalTimer != null) return;
         File signal = new File(ServerLauncher.getDataDir(), SHOW_SIGNAL_FILE);
-        signal.delete(); // 이전 실행에서 남은 알림은 무시
+        File exitSignal = new File(ServerLauncher.getDataDir(), EXIT_SIGNAL_FILE);
+        // 이전 실행에서 남은 알림은 무시한다. 단, 이 프로그램이 시작된 "이후"에 만들어진 것은 방금 온 요청이므로 지우면 안 된다
+        // (설치 프로그램이 앱이 막 켜지는 순간에 종료를 요청하면 그 신호를 지워서 요청이 사라지는 경쟁 상태가 있었음)
+        deleteIfOlderThanStart(signal);
+        deleteIfOlderThanStart(exitSignal);
         signalTimer = new Timer(700, e -> {
-            if (signal.exists() && signal.delete()) showWindow();
+            if (exitSignal.exists() && exitSignal.delete()) exit(); // 종료 훅이 저장/백업/동기화를 수행
+            else if (signal.exists() && signal.delete()) showWindow();
         });
         signalTimer.setRepeats(true);
         signalTimer.start();
+    }
+
+    // 프로그램이 시작되기 전에 만들어진 신호 파일만 삭제
+    private static void deleteIfOlderThanStart(File file) {
+        if (file.exists() && file.lastModified() < STARTED_AT_MILLIS) file.delete();
     }
 
     // ---------------------------------------------------------------- 선택 저장

@@ -8,7 +8,12 @@ import model.DataManager;
 import javax.swing.*;
 
 public class Main {
+	// Windows 시작 시 자동 실행(설치 프로그램의 선택 항목)은 --background로 실행해서, 로그인 창을 띄우지 않고
+	// 알림 영역으로 바로 숨긴다. 서버만 켜 두고 Android 앱이 연결할 수 있게 하는 용도
+	private static boolean startInBackground = false;
+
 	public static void main(String[] args) {
+		startInBackground = java.util.Arrays.asList(args).contains("--background");
 		// 종료 방식에 상관없이 항상 저장(종료 시 thread를 생성)
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			DataManager.saveAll();
@@ -59,6 +64,7 @@ public class Main {
 				DataManager.setServerUrl(ServerLauncher.getBaseUrl());
 				AppLifecycle.startSignalWatcher(); // 숨겨진 상태에서 프로그램을 또 실행하면 창을 다시 보여줌
 				startSession(); // 로그인 화면은 방화벽 점검을 기다리지 않고 바로 띄움
+				if (startInBackground) AppLifecycle.hideCurrent();
 				ensureFirewallAsync();
 			}
 		}.execute();
@@ -72,7 +78,7 @@ public class Main {
 		new SwingWorker<Boolean, Void>() {
 			@Override
 			protected Boolean doInBackground() throws Exception {
-				if (FirewallSetup.isConfigured()) return true;
+				if (FirewallSetup.isConfigured(ServerLauncher.getPort(), ServerLauncher.getDiscoveryPort())) return true;
 				SwingUtilities.invokeAndWait(() -> JOptionPane.showMessageDialog(null,
 						"Android 앱이 이 PC에 연결하려면 Windows 방화벽 허용이 필요합니다.\n"
 						+ "곧 나오는 '관리자 권한 요청'에서 [예]를 눌러주세요. (처음 한 번만 필요합니다)",
