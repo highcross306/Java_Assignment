@@ -193,21 +193,6 @@ public class DataManager {
                 ? java.time.YearMonth.parse(obj.get("allowedMonth").getAsString()) : null;
     }
 
-    // 테스트용: 비밀번호(1234)를 맞게 입력하면 서버에서 DEMO <-> ACTIVE를 전환해줌.
-    // 실제 결제(PG) 연동 전까지 "결제 완료"를 사람이 직접 흉내내기 위한 임시 버튼용 메소드.
-    // 성공하면 null, 실패하면 화면에 그대로 보여줄 에러 메시지를 반환
-    public static String togglePlanMock(String password) {
-        try {
-            JsonObject json = new JsonObject();
-            json.addProperty("password", password);
-            String body = httpPost("/me/plan/mock-pay", json.toString());
-            applyPlanJson(JsonParser.parseString(body).getAsJsonObject());
-            return null;
-        } catch (Exception e) {
-            return friendlyMessage(e);
-        }
-    }
-
     // 회원가입: 성공하면 바로 로그인된 상태가 됨 (서버가 가입과 동시에 토큰을 내려줌)
     public static String signup(String username, String password) {
         return authenticate("/auth/signup", username, password);
