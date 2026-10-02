@@ -74,18 +74,21 @@ public class MainFrame extends JFrame{
 		return sidebar;
 	}
 	
-	//새로고침 버튼 + 로그인 사용자 표시 + 로그아웃 버튼 생성
+	private JMenuItem settingsItem(String text, ActionListener action) {
+		JMenuItem item = new JMenuItem(text);
+		item.setFont(new Font("맑은 고딕", Font.PLAIN, 13));
+		item.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+		item.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		item.addActionListener(action);
+		return item;
+	}
+
+	//새로고침 버튼 + 설정 버튼(설정 메뉴: 계정/연결 정보/백업/동기화/라이선스/로그아웃) 생성
 	private JPanel buildRefreshButton() {
 		JPanel panel = new JPanel();
 		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 		panel.setBackground(WHITE);
 		panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 12, 12));
-
-		JLabel userLabel = new JLabel(DataManager.getCurrentUsername() + "님", SwingConstants.CENTER);
-		userLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-		userLabel.setForeground(GRAY_TXT);
-		userLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-		userLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 
 		JButton refreshBtn = new JButton("⟳ 새로고침");
 		refreshBtn.setFont(new Font("맑은 고딕", Font.BOLD, 13));
@@ -100,79 +103,43 @@ public class MainFrame extends JFrame{
 
 		refreshBtn.addActionListener(e -> refreshCurrentPanel()); //클릭 시 현재 화면 새로고침
 
-		// Android 앱에서 이 PC에 접속할 때 입력해야 할 주소를 보여줌
-		JButton androidInfoBtn = new JButton("Android 연결 정보");
-		androidInfoBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-		androidInfoBtn.setForeground(GRAY_TXT);
-		androidInfoBtn.setBackground(WHITE);
-		androidInfoBtn.setFocusPainted(false);
-		androidInfoBtn.setBorderPainted(true);
-		androidInfoBtn.setOpaque(true);
-		androidInfoBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		androidInfoBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		androidInfoBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-		androidInfoBtn.addActionListener(e -> showAndroidConnectInfo());
+		// 새로고침을 뺀 나머지 기능(계정, 연결 정보, 백업, 동기화, 라이선스, 로그아웃)은 "설정" 버튼 하나로 묶고,
+		// 누르면 앱의 환경설정처럼 세로 메뉴가 펼쳐진다. 버튼이 화면 맨 아래라서 메뉴는 위쪽으로 열린다
+		JPopupMenu settingsMenu = new JPopupMenu();
+		JMenuItem accountItem = new JMenuItem(DataManager.getCurrentUsername() + "님");
+		accountItem.setEnabled(false); // 로그인한 계정 표시용 (누를 수 없음)
+		accountItem.setFont(new Font("맑은 고딕", Font.BOLD, 12));
+		settingsMenu.add(accountItem);
+		settingsMenu.addSeparator();
+		settingsMenu.add(settingsItem("Android 연결 정보", e -> showAndroidConnectInfo()));
+		settingsMenu.add(settingsItem("데이터 백업/복원", e -> showBackupMenu()));
+		settingsMenu.add(settingsItem("구글 드라이브 동기화", e -> SyncDialog.show(this)));
+		settingsMenu.add(settingsItem("라이선스 등록", e -> showLicenseDialog()));
+		settingsMenu.addSeparator();
+		settingsMenu.add(settingsItem("로그아웃", e -> logout()));
 
-		JButton backupBtn = new JButton("데이터 백업/복원");
-		backupBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-		backupBtn.setForeground(GRAY_TXT);
-		backupBtn.setBackground(WHITE);
-		backupBtn.setFocusPainted(false);
-		backupBtn.setBorderPainted(false);
-		backupBtn.setOpaque(true);
-		backupBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		backupBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		backupBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-		backupBtn.addActionListener(e -> showBackupMenu());
+		JButton settingsBtn = new JButton("설정 ▲");
+		settingsBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 13));
+		settingsBtn.setForeground(GRAY_TXT);
+		settingsBtn.setBackground(WHITE);
+		settingsBtn.setFocusPainted(false);
+		settingsBtn.setBorder(BorderFactory.createLineBorder(new Color(209, 213, 219)));
+		settingsBtn.setOpaque(true);
+		settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		settingsBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		settingsBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+		settingsBtn.addActionListener(e -> {
+			// 메뉴 폭을 버튼 폭에 맞추고, 버튼 바로 위에 붙여서 연다.
+			// 이전에 지정한 크기가 남아 있으면 getPreferredSize()가 그 값을 돌려주므로 먼저 지우고 다시 계산
+			settingsMenu.setPreferredSize(null);
+			Dimension natural = settingsMenu.getPreferredSize();
+			settingsMenu.setPopupSize(Math.max(settingsBtn.getWidth(), natural.width), natural.height);
+			settingsMenu.show(settingsBtn, 0, -natural.height);
+		});
 
-		JButton syncBtn = new JButton("구글 드라이브 동기화");
-		syncBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-		syncBtn.setForeground(GRAY_TXT);
-		syncBtn.setBackground(WHITE);
-		syncBtn.setFocusPainted(false);
-		syncBtn.setBorderPainted(false);
-		syncBtn.setOpaque(true);
-		syncBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		syncBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		syncBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-		syncBtn.addActionListener(e -> SyncDialog.show(this));
-
-		JButton licenseBtn = new JButton("라이선스 등록");
-		licenseBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-		licenseBtn.setForeground(GRAY_TXT);
-		licenseBtn.setBackground(WHITE);
-		licenseBtn.setFocusPainted(false);
-		licenseBtn.setBorderPainted(false);
-		licenseBtn.setOpaque(true);
-		licenseBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		licenseBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		licenseBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-		licenseBtn.addActionListener(e -> showLicenseDialog());
-
-		JButton logoutBtn = new JButton("로그아웃");
-		logoutBtn.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-		logoutBtn.setForeground(GRAY_TXT);
-		logoutBtn.setBackground(WHITE);
-		logoutBtn.setFocusPainted(false);
-		logoutBtn.setBorderPainted(false);
-		logoutBtn.setOpaque(true);
-		logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		logoutBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		logoutBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-		logoutBtn.addActionListener(e -> logout());
-
-		panel.add(userLabel);
 		panel.add(refreshBtn);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(androidInfoBtn);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(backupBtn);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(syncBtn);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(licenseBtn);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(logoutBtn);
+		panel.add(Box.createRigidArea(new Dimension(0, 6)));
+		panel.add(settingsBtn);
 		return panel;
 	}
 
