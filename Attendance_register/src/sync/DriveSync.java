@@ -190,6 +190,39 @@ public class DriveSync {
 
     // ---------------------------------------------------------------- 설정 화면용
 
+    // 다시 로그인한 계정이 처음 동기화를 켠 계정과 같은지 확인. 다른 계정이면 그 계정의 드라이브에는 이 데이터가
+    // 없고(있어도 다른 비밀번호로 암호화됨), 이 PC의 데이터가 엉뚱한 계정에 올라갈 수 있으므로 거부한다.
+    // 처음 계정 정보가 기록돼 있지 않은 경우(이전 버전)에는 비교하지 않음
+    public synchronized void checkSameAccount(String actualEmail) throws IOException {
+        String expected = state.accountEmail;
+        if (expected == null || expected.isEmpty() || actualEmail == null || actualEmail.isEmpty()) return;
+        if (!expected.equalsIgnoreCase(actualEmail)) {
+            throw new IOException("처음 동기화를 켠 계정(" + expected + ")으로 로그인해주세요. "
+                    + "다른 계정(" + actualEmail + ")으로는 이 데이터를 동기화할 수 없습니다.");
+        }
+    }
+
+    // 화면에서 일어난 일을 "마지막 동기화 상태"에 남김
+    public synchronized void noteMessage(String message) {
+        note(message);
+    }
+
+    // 구글 로그인이 만료/해제된 뒤 다시 로그인: 로그인 정보만 새로 받고 동기화 비밀번호/암호화 키/버전 정보는
+    // 건드리지 않는다 (처음 켤 때의 동의·비밀번호 입력을 다시 하지 않고 이전 데이터와 이어서 동기화됨).
+    // 다른 계정으로 로그인했거나 드라이브에 접근할 수 없으면 로그인 정보를 남기지 않고 실패시킨다.
+    // 브라우저 로그인을 기다리는 동안 이 객체를 잠그지 않도록 synchronized가 아님
+    public void relogin(GoogleAuth auth) throws IOException {
+        auth.signIn();
+        try {
+            checkSameAccount(auth.getEmail());
+            peekRemote(); // 실제로 드라이브에 접근되는지까지 확인
+        } catch (IOException | RuntimeException e) {
+            auth.signOut();
+            throw e;
+        }
+        noteMessage("다시 로그인했습니다. 다음 실행부터 정상적으로 동기화됩니다");
+    }
+
     // 설정 화면에서 드라이브에 이미 데이터가 있는지 확인 (없으면 null)
     public synchronized RemoteStore.Meta peekRemote() throws IOException {
         return remoteFactory.get().head();

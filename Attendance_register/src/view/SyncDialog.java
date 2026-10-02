@@ -7,6 +7,7 @@ import sync.RemoteStore;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
@@ -23,6 +24,8 @@ public final class SyncDialog {
     private final JDialog dialog;
     private final JLabel statusLabel = new JLabel();
     private final JButton toggleButton = new JButton("자동 동기화 허용");
+    // 구글 로그인이 만료/해제되어 동기화가 멈춘 상태에서만 보이는 [다시 로그인]
+    private final JButton reloginButton = new JButton("다시 로그인");
     private final JPanel consentPanel = new JPanel(new GridLayout(0, 1, 0, 4));
     private final JCheckBox[] consents = {
             new JCheckBox("<html><div style='width:330px'>학생 이름·연락처 등 <b>출석 데이터 전체가 암호화되어</b> 내 구글 드라이브의 "
@@ -78,7 +81,10 @@ public final class SyncDialog {
             consentPanel.add(box);
         }
 
+        reloginButton.addActionListener(e -> relogin());
+
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        buttons.add(reloginButton);
         buttons.add(toggleButton);
         buttons.add(closeButton);
 
@@ -108,6 +114,14 @@ public final class SyncDialog {
         } else {
             sb.append("상태: <b>꺼짐</b> - 아래 내용에 모두 동의하면 [자동 동기화 허용]을 누를 수 있습니다.");
         }
+        // 동기화는 켜져 있는데 구글 로그인 정보가 없는(만료/앱 연결 해제 등) 상태: 이대로는 매번 동기화가 실패함
+        boolean needsRelogin = enabled && !auth.isSignedIn();
+        if (needsRelogin) {
+            sb.append("<br><font color='#B91C1C'>※ 구글 로그인이 만료되었거나 해제되어 <b>동기화가 멈춰 있습니다.</b> ")
+              .append("[다시 로그인]을 눌러 같은 계정으로 로그인해주세요. 암호화 키와 동기화 비밀번호는 그대로 유지됩니다.</font>");
+        }
+        reloginButton.setVisible(needsRelogin);
+        reloginButton.setEnabled(true);
         if (!auth.isClientConfigured()) {
             sb.append("<br><font color='#B91C1C'>※ 구글 로그인 설정 파일(google-client.json)이 아직 없습니다. ")
               .append("개발자 설정이 끝나기 전에는 허용해도 로그인할 수 없습니다. ")
@@ -137,6 +151,30 @@ public final class SyncDialog {
         for (JCheckBox box : consents) all &= box.isSelected();
         toggleButton.setEnabled(all);
         toggleButton.setToolTipText(all ? null : "동의 항목을 모두 체크해주세요");
+    }
+
+    // ---------------------------------------------------------------- 다시 로그인
+
+    // 로그인 정보만 새로 받는다. 동기화 비밀번호/암호화 키/버전 정보는 건드리지 않으므로 처음 켤 때의
+    // 동의·비밀번호 입력을 다시 하지 않아도 되고, 이전에 올린 데이터와 이어서 동기화된다.
+    // 처음 동기화를 켠 계정과 다른 계정으로 로그인하면 그 데이터를 쓸 수 없으므로 거부한다
+    private void relogin() {
+        if (!auth.isClientConfigured()) {
+            JOptionPane.showMessageDialog(dialog,
+                    "구글 로그인 설정 파일(google-client.json)이 없어 지금은 로그인할 수 없습니다.",
+                    "구글 드라이브 동기화", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        busy("브라우저에서 구글 로그인을 완료해주세요...");
+        runAsync(() -> {
+            sync.relogin(auth);
+            return null;
+        }, ignored -> {
+            refresh();
+            JOptionPane.showMessageDialog(dialog,
+                    "다시 로그인했습니다." + NL + "프로그램을 켜고 끌 때 정상적으로 동기화됩니다.",
+                    "구글 드라이브 동기화", JOptionPane.INFORMATION_MESSAGE);
+        }, e -> fail("다시 로그인 실패", e));
     }
 
     // ---------------------------------------------------------------- 켜기
@@ -272,6 +310,7 @@ public final class SyncDialog {
 
     private void busy(String message) {
         toggleButton.setEnabled(false);
+        reloginButton.setEnabled(false);
         statusLabel.setText("<html><div style='width:360px'>" + escape(message) + "</div></html>");
     }
 

@@ -74,6 +74,13 @@ public class MainFrame extends JFrame{
 		return sidebar;
 	}
 	
+	private static void updateSyncItemText(JMenuItem item) {
+		sync.GoogleAuth auth = ServerLauncher.getGoogleAuth();
+		sync.DriveSync drive = ServerLauncher.getDriveSync();
+		boolean needsRelogin = auth != null && drive != null && drive.isEnabled() && !auth.isSignedIn();
+		item.setText(needsRelogin ? "구글 드라이브 동기화 (재로그인 필요)" : "구글 드라이브 동기화");
+	}
+
 	private JMenuItem settingsItem(String text, ActionListener action) {
 		JMenuItem item = new JMenuItem(text);
 		item.setFont(new Font("맑은 고딕", Font.PLAIN, 13));
@@ -113,7 +120,8 @@ public class MainFrame extends JFrame{
 		settingsMenu.addSeparator();
 		settingsMenu.add(settingsItem("Android 연결 정보", e -> showAndroidConnectInfo()));
 		settingsMenu.add(settingsItem("데이터 백업/복원", e -> showBackupMenu()));
-		settingsMenu.add(settingsItem("구글 드라이브 동기화", e -> SyncDialog.show(this)));
+		JMenuItem syncItem = settingsItem("구글 드라이브 동기화", e -> SyncDialog.show(this));
+		settingsMenu.add(syncItem);
 		settingsMenu.add(settingsItem("라이선스 등록", e -> showLicenseDialog()));
 		settingsMenu.addSeparator();
 		settingsMenu.add(settingsItem("로그아웃", e -> logout()));
@@ -131,6 +139,8 @@ public class MainFrame extends JFrame{
 		settingsBtn.addActionListener(e -> {
 			// 메뉴 폭을 버튼 폭에 맞추고, 버튼 바로 위에 붙여서 연다.
 			// 이전에 지정한 크기가 남아 있으면 getPreferredSize()가 그 값을 돌려주므로 먼저 지우고 다시 계산
+			// 동기화가 켜져 있는데 구글 로그인이 풀린 상태면 메뉴에서 바로 알아볼 수 있게 표시
+			updateSyncItemText(syncItem);
 			settingsMenu.setPreferredSize(null);
 			Dimension natural = settingsMenu.getPreferredSize();
 			settingsMenu.setPopupSize(Math.max(settingsBtn.getWidth(), natural.width), natural.height);
