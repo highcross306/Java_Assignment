@@ -102,6 +102,13 @@ public class LoginWindow extends JFrame {
         setLocationRelativeTo(null); // 소유 창이 없으니 화면 가운데에 띄움
     }
 
+    // 창 아래쪽 안내 문구에 오류를 표시 (예: Windows 시작 시 자동 로그인에 실패한 이유)
+    public void showError(String message) {
+        messageLabel.setForeground(RED);
+        messageLabel.setText(message);
+        pack();
+    }
+
     // 비밀번호 입력칸 오른쪽에 눈 모양 아이콘 토글 버튼을 붙인 한 줄짜리 패널을 만듦.
     // 기본은 별표(echo char)로 가려져 있고(감은 눈), 누르면 그 동안만 평문으로 보여줌(뜬 눈)
     private JPanel passwordFieldWithToggle() {

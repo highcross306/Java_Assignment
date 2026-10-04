@@ -37,7 +37,7 @@ function Wait-Health($port, $sec) { for ($i = 0; $i -lt $sec; $i++) { if ((Healt
 function Reg-Values($path) { $h = @{}; if (Test-Path $path) { $k = Get-Item $path; foreach ($n in $k.GetValueNames()) { $h[$n] = $k.GetValue($n) } }; return $h }
 
 "=== T1. 새로 설치 (한글+공백 경로)"
-$out = Setup @('--silent', '--install-dir', $Inst, '--no-firewall', '--no-android', '--no-launch')
+$out = Setup @('--silent', '--install-dir', $Inst, '--no-firewall', '--no-android', '--no-launch', '--no-autostart')
 Check "T1 설치 성공 메시지" (($out -join "`n") -match '설치 완료')
 foreach ($f in 'AttendanceManager.exe', 'app\attendance-desktop.jar', 'app\server\attendance-server.jar', 'app\server\h2.jar', 'runtime\bin\java.exe', 'runtime\bin\javaw.exe', 'setup\setup.jar', 'AttendanceApp.apk') {
   Check "T1 파일 $f" (Test-Path -LiteralPath "$Inst\$f")
@@ -52,6 +52,7 @@ Check "T1 앱 목록 등록: 이름/버전/위치" ($u['DisplayName'] -eq '출�
 Check "T1 앱 목록 등록: 제거 명령" ($u['UninstallString'] -match 'javaw\.exe' -and $u['UninstallString'] -match '--uninstall')
 Check "T1 NoModify/NoRepair" ($u['NoModify'] -eq 1 -and $u['NoRepair'] -eq 1)
 Check "T1 자동 실행은 꺼져 있음" (-not (Reg-Values "$RK\Run").ContainsKey('AttendanceManager'))
+Check "T1 프로그램 설정에도 직접 실행으로 기록 (autostart=off)" ((Get-Content "$T\home\.attendance-desktop\ui-prefs.properties") -contains 'autostart=off')
 Check "T1 기본 포트라 settings.properties 없음" (-not (Test-Path "$T\home\.attendance-desktop\settings.properties"))
 
 "=== T2. 설치된 앱 실행 (설치된 런타임/서버로)"
@@ -94,12 +95,13 @@ Check "T5 이전 포트 설정이 지워짐" (-not ($settings -match 'server\.po
 $run = Reg-Values "$RK\Run"
 "   (Run 값: $($run['AttendanceManager']))"
 Check "T5 자동 실행 등록: --background" ($run['AttendanceManager'] -match 'AttendanceManager\.exe' -and $run['AttendanceManager'] -match '--background')
+Check "T5 프로그램 설정에도 자동으로 시작으로 기록 (autostart=on)" ((Get-Content "$T\home\.attendance-desktop\ui-prefs.properties") -contains 'autostart=on')
 
-"=== T6. --background 로 시작하면 창 없이 숨김 상태로 서버만 실행"
+"=== T6. --background 로 시작: 서버는 실행, 시험용 새 DB에는 저장된 계정이 없어 자동 로그인 실패 -> 로그인 창 표시"
 $app = Installed-Java '--background'
 Check "T6 서버 기동" (Wait-Health 18080 40)
-Start-Sleep 3; $app.Refresh()
-Check "T6 보이는 창 없음 (MainWindowHandle=0)" ($app.MainWindowHandle -eq 0)
+for ($i = 0; $i -lt 15 -and $app.MainWindowHandle -eq 0; $i++) { Start-Sleep 1; $app.Refresh() }
+Check "T6 자동 로그인 실패 시 로그인 창이 뜸 ($($app.MainWindowTitle))" ($app.MainWindowTitle -match '로그인')
 New-Item -ItemType File -Force "$T\home\.attendance-desktop\exit.signal" | Out-Null
 $null = $app.WaitForExit(30000)
 Check "T6 exit.signal로 정상 종료됨" ($app.HasExited)

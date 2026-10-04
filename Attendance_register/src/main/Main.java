@@ -8,8 +8,9 @@ import model.DataManager;
 import javax.swing.*;
 
 public class Main {
-	// Windows 시작 시 자동 실행(설치 프로그램의 선택 항목)은 --background로 실행해서, 로그인 창을 띄우지 않고
-	// 알림 영역으로 바로 숨긴다. 서버만 켜 두고 Android 앱이 연결할 수 있게 하는 용도
+	// Windows 시작 시 자동 실행(AutoStart가 등록)은 --background로 실행된다. 이때는 "내 정보 기억"으로
+	// 저장된 아이디/비밀번호로 자동 로그인하고, 성공하면 메인 창을 한 번도 띄우지 않고 처음부터 알림 영역에서
+	// 실행한다(서버가 켜져 있으니 Android 앱이 바로 연결 가능). 저장된 정보가 없거나 로그인에 실패하면 로그인 창을 띄운다
 	private static boolean startInBackground = false;
 
 	public static void main(String[] args) {
@@ -63,9 +64,11 @@ public class Main {
 				}
 				DataManager.setServerUrl(ServerLauncher.getBaseUrl());
 				AppLifecycle.startSignalWatcher(); // 숨겨진 상태에서 프로그램을 또 실행하면 창을 다시 보여줌
-				startSession(); // 로그인 화면은 방화벽 점검을 기다리지 않고 바로 띄움
-				if (startInBackground) AppLifecycle.hideCurrent();
+				// 로그인 화면은 방화벽 점검을 기다리지 않고 바로 띄움
+				if (startInBackground) autoLoginInBackground();
+				else startSession();
 				ensureFirewallAsync();
+				new Thread(AutoStart::applyOnStartup, "autostart").start();
 			}
 		}.execute();
 	}
@@ -104,9 +107,47 @@ public class Main {
 		}.execute();
 	}
 
+	// Windows 시작 시(--background): 저장된 정보로 로그인 -> 데이터 불러오기 -> 메인 창을 숨긴 채로 생성.
+	// 실패하면 이유를 적은 로그인 창을 보여준다 (그 뒤는 평소와 같음)
+	private static void autoLoginInBackground() {
+		String username = DataManager.isRememberMeEnabled() ? DataManager.getSavedUsername() : null;
+		String password = DataManager.isRememberMeEnabled() ? DataManager.getSavedPassword() : null;
+		if (username == null || password == null) {
+			startSession("저장된 로그인 정보가 없어 자동 로그인하지 못했습니다");
+			return;
+		}
+		new SwingWorker<String, Void>() {
+			@Override
+			protected String doInBackground() {
+				String error = DataManager.login(username, password);
+				if (error == null) DataManager.loadAll();
+				return error;
+			}
+			@Override
+			protected void done() {
+				String error;
+				try {
+					error = get();
+				} catch (Exception e) {
+					error = e.getMessage();
+				}
+				if (error != null) {
+					startSession("자동 로그인 실패: " + error);
+					return;
+				}
+				new MainFrame(false);
+				AppLifecycle.hideCurrent();
+			}
+		}.execute();
+	}
+
 	// 로그인 화면 -> 메인 화면 진입까지의 한 번의 세션.
 	// 로그아웃하면 MainFrame이 이 메서드를 다시 호출해서 로그인 화면으로 돌아감
 	public static void startSession() {
+		startSession(null);
+	}
+
+	private static void startSession(String errorMessage) {
 		// 서버가 회원가입/로그인 시스템을 갖추면서, 데이터를 불러오기 전에
 		// 먼저 로그인해야 함 (로그인해야 어떤 사용자의 데이터를 가져올지 알 수 있음).
 		// LoginWindow는 JFrame이라 작업표시줄에 독립적으로 뜨며, 로그인 성공 시
@@ -126,6 +167,7 @@ public class Main {
 				}
 			}.execute();
 		});
+		if (errorMessage != null) loginWindow.showError(errorMessage);
 		loginWindow.setVisible(true);
 	}
 }

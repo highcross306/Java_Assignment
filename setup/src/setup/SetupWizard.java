@@ -32,7 +32,9 @@ final class SetupWizard {
         private final JTextField dirField = new JTextField(46);
         private final JCheckBox desktopBox = new JCheckBox("바탕화면에 바로가기 만들기");
         private final JCheckBox startMenuBox = new JCheckBox("시작 메뉴에 등록");
-        private final JCheckBox autostartBox = new JCheckBox("Windows를 켤 때 자동으로 실행 (백그라운드)");
+        // PC를 켤 때 자동으로 시작할지, 사용자가 직접 실행할지 둘 중 하나를 고름
+        private final JRadioButton autoStartRadio = new JRadioButton("자동으로 시작 (권장)");
+        private final JRadioButton manualStartRadio = new JRadioButton("직접 실행");
         private final JCheckBox firewallBox = new JCheckBox("방화벽 자동 설정 (권장 - 관리자 권한 요청이 한 번 나옵니다)");
         private final JCheckBox androidBox = new JCheckBox("Android 앱 설치 (USB로 연결된 폰에 설치하거나, QR 코드로 안내)");
 
@@ -131,7 +133,7 @@ final class SetupWizard {
             p.add(dirRow);
             p.add(Box.createVerticalStrut(16));
 
-            for (JCheckBox b : new JCheckBox[] { desktopBox, startMenuBox, autostartBox, firewallBox, androidBox }) {
+            for (JCheckBox b : new JCheckBox[] { desktopBox, startMenuBox, firewallBox, androidBox }) {
                 b.setAlignmentX(Component.LEFT_ALIGNMENT);
                 b.setFocusPainted(false);
                 p.add(b);
@@ -139,17 +141,44 @@ final class SetupWizard {
             }
             desktopBox.setSelected(o.desktopShortcut);
             startMenuBox.setSelected(o.startMenu);
-            autostartBox.setSelected(o.autostart);
             firewallBox.setSelected(o.firewall);
             androidBox.setSelected(o.android);
 
-            JLabel hint = new JLabel("<html><div style='width:560px;color:#6B7280'>"
-                    + "자동 실행을 켜면 Windows를 켤 때 창 없이 알림 영역에서 실행되어, 폰이 언제든 연결할 수 있습니다."
-                    + "</div></html>");
-            hint.setAlignmentX(Component.LEFT_ALIGNMENT);
-            p.add(Box.createVerticalStrut(8));
-            p.add(hint);
+            p.add(Box.createVerticalStrut(10));
+            p.add(startModePanel());
             return p;
+        }
+
+        // "PC를 켤 때" 선택: 자동으로 시작 / 직접 실행 (설치 후에도 프로그램의 설정 메뉴에서 바꿀 수 있음)
+        private JPanel startModePanel() {
+            ButtonGroup group = new ButtonGroup();
+            group.add(autoStartRadio);
+            group.add(manualStartRadio);
+            (o.autostart ? autoStartRadio : manualStartRadio).setSelected(true);
+
+            JPanel box = new JPanel();
+            box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+            box.setBorder(BorderFactory.createTitledBorder("컴퓨터를 켤 때"));
+            box.setAlignmentX(Component.LEFT_ALIGNMENT);
+            box.add(radioWithHint(autoStartRadio,
+                    "Windows를 켜면 창 없이 알림 영역에서 자동으로 실행되어, 폰이 언제든 연결할 수 있습니다.<br>"
+                    + "'내 정보 기억'으로 저장된 아이디로 자동 로그인합니다. (정보가 없거나 실패하면 로그인 창이 뜹니다)"));
+            box.add(Box.createVerticalStrut(4));
+            box.add(radioWithHint(manualStartRadio,
+                    "바로가기를 눌러 직접 실행할 때만 켜집니다.<br>프로그램을 실행하기 전에는 폰이 이 PC에 연결되지 않습니다."));
+            box.setMaximumSize(new Dimension(Integer.MAX_VALUE, box.getPreferredSize().height));
+            return box;
+        }
+
+        private JPanel radioWithHint(JRadioButton radio, String hint) {
+            radio.setFocusPainted(false);
+            JLabel label = new JLabel("<html><div style='color:#6B7280'>" + hint + "</div></html>");
+            label.setBorder(BorderFactory.createEmptyBorder(0, 24, 0, 0)); // 라디오 버튼 글자와 줄을 맞춤
+            JPanel row = new JPanel(new BorderLayout());
+            row.add(radio, BorderLayout.NORTH);
+            row.add(label, BorderLayout.CENTER);
+            row.setAlignmentX(Component.LEFT_ALIGNMENT);
+            return row;
         }
 
         private JPanel progressPage() {
@@ -211,7 +240,7 @@ final class SetupWizard {
             o.installDir = Path.of(dir);
             o.desktopShortcut = desktopBox.isSelected();
             o.startMenu = startMenuBox.isSelected();
-            o.autostart = autostartBox.isSelected();
+            o.autostart = autoStartRadio.isSelected();
             o.firewall = firewallBox.isSelected();
             o.android = androidBox.isSelected();
 
@@ -284,6 +313,10 @@ final class SetupWizard {
             if (result.success) {
                 html.append("설치 위치: ").append(escape(result.installDir.toString())).append("<br>");
                 html.append("서버 포트: ").append(result.port).append("<br>");
+                html.append("컴퓨터를 켤 때: ").append(o.autostart
+                        ? "자동으로 시작 (알림 영역에서 실행, 저장된 아이디로 자동 로그인)"
+                        : "직접 실행 (바로가기를 눌러야 켜집니다)").append("<br>");
+                html.append("<span style='color:#6B7280'>설치 후에도 프로그램의 설정 메뉴에서 바꿀 수 있습니다.</span><br>");
                 if (!result.warnings.isEmpty()) {
                     html.append("<br><b style='color:#B45309'>확인이 필요한 항목</b><br>");
                     for (String w : result.warnings) html.append("· ").append(escape(w)).append("<br>");

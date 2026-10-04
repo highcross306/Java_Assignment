@@ -4,7 +4,7 @@ package setup;
 //   (옵션 없음)            설치 마법사
 //   --uninstall            제거 (설치된 폴더의 runtime으로 실행되며 앱 목록의 [제거]가 이 명령을 부름)
 //   --silent               화면 없이 설치/제거 (시험, 여러 PC 일괄 설치용)
-//   --install-dir <경로>  --no-desktop-shortcut  --no-start-menu  --autostart  --no-firewall  --no-android  --no-launch  --port <번호>
+//   --install-dir <경로>  --no-desktop-shortcut  --no-start-menu  --autostart  --no-autostart  --no-firewall  --no-android  --no-launch  --port <번호>
 //   --delete-data          (제거 시) 출석 데이터도 삭제
 public final class SetupMain {
 

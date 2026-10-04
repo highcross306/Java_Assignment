@@ -264,18 +264,23 @@ final class Installer {
 
     // ~/.attendance-desktop/settings.properties 의 server.port (앱이 시작할 때 읽음). null이면 항목을 지움
     static void writeSettingsPort(Integer port) throws IOException {
+        writeDataProperty("settings.properties", "server.port", port == null ? null : String.valueOf(port), "Attendance Manager settings");
+    }
+
+    // ~/.attendance-desktop/<파일> 의 항목 하나만 바꾸고 나머지는 그대로 둠. value가 null이면 항목을 지움
+    static void writeDataProperty(String fileName, String key, String value, String comment) throws IOException {
         Files.createDirectories(dataDir());
-        Path file = dataDir().resolve("settings.properties");
+        Path file = dataDir().resolve(fileName);
         Properties p = new Properties();
         if (Files.exists(file)) {
             try (var in = new java.io.InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8)) {
                 p.load(in);
             }
         }
-        if (port == null) p.remove("server.port");
-        else p.setProperty("server.port", String.valueOf(port));
+        if (value == null) p.remove(key);
+        else p.setProperty(key, value);
         try (var out = new java.io.OutputStreamWriter(Files.newOutputStream(file), StandardCharsets.UTF_8)) {
-            p.store(out, "Attendance Manager settings");
+            p.store(out, comment);
         }
     }
 
@@ -401,8 +406,11 @@ final class Installer {
                 l.log("Windows를 시작하면 프로그램이 백그라운드로 자동 실행됩니다.");
             } else {
                 Win.regDeleteValue(Win.runKey(), Win.APP_KEY_NAME);
-                l.log("자동 실행: 사용 안 함");
+                l.log("자동 실행: 사용 안 함 (직접 실행)");
             }
+            // 프로그램도 같은 선택을 따르도록 기록 (프로그램은 이 값이 on일 때만 실행할 때마다 자동 실행을 다시 등록함.
+            // 기록하지 않으면 예전에 켜 둔 값 때문에 "직접 실행"을 골라도 프로그램이 자동 실행을 다시 켜 버림)
+            writeDataProperty("ui-prefs.properties", "autostart", o.autostart ? "on" : "off", "UI preferences");
         } catch (IOException | RuntimeException e) {
             warn("자동 실행을 설정하지 못했습니다: " + e.getMessage());
         }

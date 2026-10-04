@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import main.AppLifecycle;
+import main.AutoStart;
 import main.Main;
 import model.DataManager;
 import server.BackupManager;
@@ -40,6 +41,11 @@ public class MainFrame extends JFrame{
 	private ExcelExportPanel excelPanel;
 
 	public MainFrame() {
+		this(true);
+	}
+
+	// show=false: Windows 시작 시 자동 로그인한 경우처럼, 창을 띄우지 않고 처음부터 백그라운드로 둘 때
+	public MainFrame(boolean show) {
 		super("학원 출석 관리 프로그램");
 		AppLifecycle.register(this); // [X]를 누르면 "백그라운드로 실행 / 완전히 종료" 선택 (종료하면 종료 훅이 저장/백업 수행)
 		setSize(1100, 700);
@@ -53,7 +59,7 @@ public class MainFrame extends JFrame{
 		
 		
 		setLocationRelativeTo(null); //null->모니터 화면 정중앙에 배치
-		setVisible(true);
+		if (show) setVisible(true);
 	}
 	
 	//사이드바 생성
@@ -121,6 +127,18 @@ public class MainFrame extends JFrame{
 			settingsMenu.add(settingsItem("라이선스 등록", e -> showLicenseDialog()));
 		}
 		settingsMenu.add(settingsItem("닫기 버튼 동작", e -> AppLifecycle.showClosePreferenceDialog(this)));
+		if (AutoStart.isAvailable()) { // 실행 파일로 실행했을 때만 (개발 중 직접 실행에서는 등록할 경로가 없음)
+			JMenuItem autoStartItem = settingsItem("", e -> toggleAutoStart());
+			settingsMenu.add(autoStartItem);
+			// 메뉴를 열 때마다 현재 상태를 표시
+			settingsMenu.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+				public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
+					autoStartItem.setText("Windows 시작 시 자동 실행: " + (AutoStart.isEnabled() ? "켜짐" : "꺼짐"));
+				}
+				public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {}
+				public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {}
+			});
+		}
 		settingsMenu.addSeparator();
 		settingsMenu.add(settingsItem("로그아웃", e -> logout()));
 
@@ -253,6 +271,41 @@ public class MainFrame extends JFrame{
 		if (expires == null) return "현재 상태: <b>정식(ACTIVE)</b> - 기한 없음";
 		return "현재 상태: <b>정식(ACTIVE)</b>" + (holder == null || holder.isEmpty() ? "" : " - " + holder)
 				+ "<br>라이선스 만료일: " + expires;
+	}
+
+	//Windows 시작 시 자동 실행 켜기/끄기. 켜 두면 PC를 켤 때 저장된 아이디로 자동 로그인해서 백그라운드로 실행됨
+	private void toggleAutoStart() {
+		boolean enable = !AutoStart.isEnabled();
+		String msg = enable
+				? "Windows를 켤 때 이 프로그램을 백그라운드로 자동 실행할까요?\n"
+					+ "'내 정보 기억'으로 저장된 아이디로 자동 로그인하고, 창 없이 알림 영역에서 실행됩니다.\n"
+					+ "(자동 로그인에 실패하면 로그인 창이 뜹니다)"
+				: "Windows 시작 시 자동 실행을 끌까요?\n끄면 PC를 켠 뒤 직접 실행하기 전까지 Android 앱이 연결되지 않습니다.";
+		if (JOptionPane.showConfirmDialog(this, msg, "Windows 시작 시 자동 실행", JOptionPane.YES_NO_OPTION)
+				!= JOptionPane.YES_OPTION) return;
+		new SwingWorker<Boolean, Void>() {
+			@Override
+			protected Boolean doInBackground() {
+				return AutoStart.setEnabled(enable);
+			}
+			@Override
+			protected void done() {
+				boolean ok;
+				try {
+					ok = get();
+				} catch (Exception e) {
+					ok = false;
+				}
+				if (!ok) {
+					JOptionPane.showMessageDialog(MainFrame.this, "자동 실행 설정을 바꾸지 못했습니다.", "오류", JOptionPane.ERROR_MESSAGE);
+				} else if (enable && !DataManager.isRememberMeEnabled()) {
+					JOptionPane.showMessageDialog(MainFrame.this,
+							"자동 실행을 켰습니다.\n다만 '내 정보 기억'이 꺼져 있어서 자동 로그인은 되지 않고, PC를 켤 때 로그인 창이 뜹니다.\n"
+							+ "자동 로그인을 원하면 로그아웃 후 '내 정보 기억'을 체크하고 다시 로그인해 주세요.",
+							"Windows 시작 시 자동 실행", JOptionPane.INFORMATION_MESSAGE);
+				}
+			}
+		}.execute();
 	}
 
 	//로그아웃: 확인 후 변경사항을 저장하고, 이 창을 닫은 뒤 로그인 화면부터 다시 시작

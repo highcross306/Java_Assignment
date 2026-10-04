@@ -159,7 +159,7 @@ public final class AppLifecycle {
         });
     }
 
-    // 자동 실행(--background) 때 사용: 방금 띄운 창을 바로 숨김
+    // 자동 실행(--background)에서 자동 로그인에 성공했을 때 사용: 한 번도 보여주지 않은 메인 창을 숨긴 상태로 두고 알림 영역 아이콘을 띄움
     public static void hideCurrent() {
         SwingUtilities.invokeLater(() -> {
             if (current != null) hide(current);
@@ -269,8 +269,17 @@ public final class AppLifecycle {
     }
 
     static void setClosePreference(String value) {
+        setPref(PREF_KEY, value);
+    }
+
+    // ui-prefs.properties의 다른 항목(예: AutoStart의 autostart)도 같은 파일에 함께 저장
+    static String getPref(String key, String def) {
+        return loadPrefs().getProperty(key, def);
+    }
+
+    static synchronized void setPref(String key, String value) {
         Properties p = loadPrefs();
-        p.setProperty(PREF_KEY, value);
+        p.setProperty(key, value);
         try (OutputStreamWriter out = new OutputStreamWriter(new FileOutputStream(prefsFile()), StandardCharsets.UTF_8)) {
             p.store(out, "UI preferences");
         } catch (IOException e) {

@@ -12,7 +12,7 @@ final class Options {
     Path installDir = defaultInstallDir();
     boolean desktopShortcut = true;
     boolean startMenu = true;
-    boolean autostart = false;        // Windows 시작 시 백그라운드로 자동 실행
+    boolean autostart = true;         // Windows 시작 시 백그라운드로 자동 실행 (저장된 정보로 자동 로그인)
     boolean firewall = true;          // 방화벽 규칙 자동 등록 (관리자 권한 요청이 한 번 뜸)
     boolean android = true;           // Android 앱 설치(USB 또는 QR)
     boolean launchAfter = true;
@@ -34,6 +34,7 @@ final class Options {
                 case "--no-desktop-shortcut" -> o.desktopShortcut = false;
                 case "--no-start-menu" -> o.startMenu = false;
                 case "--autostart" -> o.autostart = true;
+                case "--no-autostart" -> o.autostart = false;
                 case "--no-firewall" -> o.firewall = false;
                 case "--no-android" -> o.android = false;
                 case "--no-launch" -> o.launchAfter = false;
