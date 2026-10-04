@@ -115,8 +115,11 @@ public class MainFrame extends JFrame{
 		settingsMenu.add(settingsItem("Android 연결 정보", e -> showAndroidConnectInfo()));
 		settingsMenu.add(settingsItem("데이터 백업/복원", e -> showBackupMenu()));
 		JMenuItem syncItem = settingsItem("구글 드라이브 동기화", e -> SyncDialog.show(this));
-		settingsMenu.add(syncItem);
-		settingsMenu.add(settingsItem("라이선스 등록", e -> showLicenseDialog()));
+		// 베타판에서는 구글 드라이브 동기화와 라이선스 등록을 메뉴에서 감춤 (main.AppEdition 참고)
+		if (!main.AppEdition.BETA) {
+			settingsMenu.add(syncItem);
+			settingsMenu.add(settingsItem("라이선스 등록", e -> showLicenseDialog()));
+		}
 		settingsMenu.add(settingsItem("닫기 버튼 동작", e -> AppLifecycle.showClosePreferenceDialog(this)));
 		settingsMenu.addSeparator();
 		settingsMenu.add(settingsItem("로그아웃", e -> logout()));

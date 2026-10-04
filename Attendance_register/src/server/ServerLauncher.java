@@ -127,13 +127,16 @@ public class ServerLauncher {
         // 동기화 실패(오프라인 등)는 앱 실행을 막지 않고 상태 메시지로만 남는다
         backups = new BackupManager(dataDir);
         File appDir = getAppDir();
-        googleAuth = new GoogleAuth(dataDir,
-                new File(appDir, "google-client.json"),
-                new File(appDir.getParentFile() == null ? appDir : appDir.getParentFile(), "google-client.json"),
-                new File(dataDir, "google-client.json"));
-        driveSync = new DriveSync(dataDir, () -> new DriveClient(googleAuth),
-                new SwingSyncUi(), name -> backups.snapshot(name),
-                file -> DbFingerprint.compute(file, findH2Jar(), findJavaExecutable()));
+        // 베타판에서는 구글 드라이브 동기화를 만들지 않음 -> googleAuth/driveSync가 null이면 동기화 단계는 모두 건너뜀
+        if (!main.AppEdition.BETA) {
+            googleAuth = new GoogleAuth(dataDir,
+                    new File(appDir, "google-client.json"),
+                    new File(appDir.getParentFile() == null ? appDir : appDir.getParentFile(), "google-client.json"),
+                    new File(dataDir, "google-client.json"));
+            driveSync = new DriveSync(dataDir, () -> new DriveClient(googleAuth),
+                    new SwingSyncUi(), name -> backups.snapshot(name),
+                    file -> DbFingerprint.compute(file, findH2Jar(), findJavaExecutable()));
+        }
 
         // 지난 실행이 강제 종료/정전 등으로 끝났다면 종료 때 했어야 할 일(마지막 상태 백업, 변경 내용 드라이브 업로드)을
         // 건너뛴 것이므로 지금 대신 한다. 서버는 위에서 정리됐고 아직 새로 띄우기 전이라 DB 파일이 닫혀 있다.
@@ -141,9 +144,9 @@ public class ServerLauncher {
         if (session == SessionGuard.Result.PREVIOUS_EXIT_UNCLEAN) {
             System.err.println("지난 실행이 정상 종료되지 않아 종료 절차(백업, 동기화)를 지금 수행합니다");
             backups.onShutdown();
-            driveSync.afterServerStop();
+            if (driveSync != null) driveSync.afterServerStop();
         }
-        driveSync.beforeServerStart();
+        if (driveSync != null) driveSync.beforeServerStart();
         backups.onStartup();
 
         try {

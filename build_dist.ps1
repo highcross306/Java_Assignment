@@ -46,13 +46,19 @@ try {
 
 # 2-2) 구글 로그인 설정(OAuth 클라이언트 ID). 저장소에는 올리지 않으므로 이 폴더에 있을 때만 포함됨
 #      없으면 구글 드라이브 동기화 메뉴가 "설정 파일 없음"으로 안내하고 나머지 기능은 정상 동작
+#      베타판(Attendance_register\src\main\AppEdition.java의 BETA = true)은 동기화 기능을 감추므로 넣지 않음
 $googleClient = Join-Path $root "google-client.json"
-if (Test-Path $googleClient) {
+$isBeta = Select-String -Path (Join-Path $root "Attendance_register\src\main\AppEdition.java") -Pattern "BETA = true;" -SimpleMatch -Quiet
+if ($isBeta) {
+    Write-Host "베타판: 구글 드라이브 동기화·라이선스 기능을 감춘 상태로 빌드합니다 (google-client.json 미포함)"
+} elseif (Test-Path $googleClient) {
     Copy-Item $googleClient "$stage\google-client.json"
 } else {
     Write-Host "참고: google-client.json이 없어 구글 드라이브 동기화는 비활성 상태로 배포됩니다 (docs\구글드라이브_동기화_설정.md 참고)"
 }
-Copy-Item (Join-Path $root "docs\구글드라이브_동기화_설정.md") "$stage\구글드라이브_동기화_설정.md" -ErrorAction SilentlyContinue
+if (-not $isBeta) {
+    Copy-Item (Join-Path $root "docs\구글드라이브_동기화_설정.md") "$stage\구글드라이브_동기화_설정.md" -ErrorAction SilentlyContinue
+}
 
 # 3) 최소 런타임(jlink): 데스크톱 앱 + Spring Boot 서버가 같은 JVM 런타임을 쓰므로 둘 다 필요한 모듈
 $modules = "java.base,java.desktop,java.sql,java.naming,java.management,java.instrument," +
