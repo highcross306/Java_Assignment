@@ -57,7 +57,7 @@ final class SetupWizard {
                     onCancel();
                 }
             });
-            setSize(680, 540);
+            setSize(680, 570);
             setLocationRelativeTo(null);
             setResizable(false);
 
@@ -136,8 +136,9 @@ final class SetupWizard {
             dirRow.add(browse, BorderLayout.EAST);
             dirRow.setAlignmentX(Component.LEFT_ALIGNMENT);
             p.add(dirLabel);
+            p.add(Box.createVerticalStrut(6));
             p.add(dirRow);
-            p.add(Box.createVerticalStrut(16));
+            p.add(Box.createVerticalStrut(28)); // 설치 위치 줄과 아래 체크 상자 사이를 넉넉히 띄움
 
             for (JCheckBox b : new JCheckBox[] { desktopBox, startMenuBox, firewallBox, androidBox }) {
                 b.setAlignmentX(Component.LEFT_ALIGNMENT);
