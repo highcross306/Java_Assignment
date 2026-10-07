@@ -123,12 +123,18 @@ final class SetupWizard {
                     dirField.setText(fc.getSelectedFile().toPath().resolve("AttendanceManager").toString());
                 }
             });
-            JPanel dirRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-            dirRow.add(dirField);
-            dirRow.add(browse);
+            // 입력칸은 남는 폭을 채우고 [찾아보기]는 항상 오른쪽에 붙임.
+            // (FlowLayout이면 46칸 입력칸 때문에 버튼이 다음 줄로 밀려나고, 한 줄 높이로 고정된 탓에 잘려서 안 보였음)
+            JPanel dirRow = new JPanel(new BorderLayout(6, 0)) {
+                // BoxLayout이 이 줄을 세로로 늘리지 않도록 높이를 한 줄로 제한 (글꼴이 바뀐 뒤의 실제 높이 기준)
+                @Override
+                public Dimension getMaximumSize() {
+                    return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+                }
+            };
+            dirRow.add(dirField, BorderLayout.CENTER);
+            dirRow.add(browse, BorderLayout.EAST);
             dirRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-            // BoxLayout이 이 줄을 세로로 늘리지 않도록 높이를 고정 (안 하면 아래 항목들과 사이에 큰 빈 공간이 생김)
-            dirRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, dirRow.getPreferredSize().height));
             p.add(dirLabel);
             p.add(dirRow);
             p.add(Box.createVerticalStrut(16));
