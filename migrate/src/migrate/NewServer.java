@@ -3,6 +3,7 @@ package migrate;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 
 import java.io.File;
@@ -61,7 +62,8 @@ public class NewServer {
         try {
             HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(baseUrl + "/api/health"))
                     .timeout(Duration.ofSeconds(5)).GET().build(), HttpResponse.BodyHandlers.ofString());
-            return r.statusCode() == 200;
+            // 상태 코드만 보면 같은 포트를 쓰는 다른 프로그램도 "켜져 있음"으로 오판하므로 본문까지 확인
+            return r.statusCode() == 200 && "OK".equals(r.body() == null ? null : r.body().trim());
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
             return false;
         }
@@ -146,7 +148,17 @@ public class NewServer {
         }
         if (r.statusCode() / 100 != 2) throw new ApiException(r.statusCode(), errorMessage(r));
         String text = r.body();
-        return text == null || text.isBlank() ? new JsonObject() : JsonParser.parseString(text);
+        if (text == null || text.isBlank()) return new JsonObject();
+        try {
+            return JsonParser.parseString(text);
+        } catch (JsonParseException e) {
+            // JSON이 아닌 응답: 서버 주소가 출석 관리 프로그램이 아닌 곳을 가리킬 때 등. 무엇을 받았는지 그대로 보여줌
+            String head = text.length() > 200 ? text.substring(0, 200) + "..." : text;
+            throw new IOException(method + " " + path + " 응답이 올바른 JSON이 아닙니다 (상태 " + r.statusCode()
+                    + ", " + r.headers().firstValue("Content-Type").orElse("Content-Type 없음") + ")\n"
+                    + "서버 주소(" + baseUrl + ")가 지금 출석 관리 프로그램이 맞는지 확인해 주세요.\n"
+                    + "받은 내용: " + head, e);
+        }
     }
 
     private static String errorMessage(HttpResponse<String> r) {
