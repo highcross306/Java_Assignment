@@ -175,6 +175,9 @@ public class ServerLauncher {
             // 이 앱이 강제 종료돼도 서버가 포트를 붙잡은 채 남지 않도록, 서버가 이 PID를 감시하다가
             // 사라지면 스스로 종료함 (서버 쪽 ParentProcessWatcher)
             pb.environment().put("ATTENDANCE_PARENT_PID", String.valueOf(ProcessHandle.current().pid()));
+            // [Android 연결 정보]의 QR 코드로 폰이 앱을 내려받을 수 있도록 서버가 이 APK를 제공함
+            File apk = findApk();
+            if (apk != null) pb.environment().put("ATTENDANCE_APK_PATH", apk.getAbsolutePath());
             pb.redirectOutput(new File(dataDir, "server.log"));
             pb.redirectErrorStream(true);
             process = pb.start();
@@ -413,6 +416,31 @@ public class ServerLauncher {
         return null;
     }
 
+    // 폰에 설치할 Android 앱. 설치 프로그램이 설치 폴더(app 폴더의 상위)에 AttendanceApp.apk로 넣어둠.
+    // 개발 중에는 -Dattendance.apk=경로 로 지정
+    public static File findApk() {
+        String override = System.getProperty("attendance.apk");
+        if (override != null) {
+            File f = new File(override);
+            return f.isFile() ? f : null;
+        }
+        File appDir = getAppDir();
+        File[] candidates = {
+                new File(appDir, "AttendanceApp.apk"),
+                new File(appDir.getParentFile() == null ? appDir : appDir.getParentFile(), "AttendanceApp.apk")
+        };
+        for (File candidate : candidates) {
+            if (candidate.isFile()) return candidate;
+        }
+        return null;
+    }
+
+    // 폰이 QR 코드로 열 APK 내려받기 주소 (같은 Wi-Fi의 이 PC 주소를 못 찾으면 null)
+    public static String getApkDownloadUrl() {
+        String ip = getLanIp();
+        return ip == null ? null : "http://" + ip + ":" + PORT + "/download/AttendanceApp.apk";
+    }
+
     // 동기화가 "DB 내용이 바뀌었는지" 비교할 때 쓰는 H2 도구 jar (서버 jar 안에 들어 있는 것과 같은 버전을
     // 배포본의 server/h2.jar로 함께 넣어둠). 개발 중에는 -Dattendance.h2.jar=경로 로 지정
     private static File findH2Jar() {
@@ -477,8 +505,17 @@ public class ServerLauncher {
             "zerotier", "hamachi", "tailscale", "loopback", "vpn", "teredo"
     };
 
-    // Android 앱 로그인 화면에 입력해줄, 같은 와이파이 안에서 이 PC를 가리키는 주소
+    // Android 앱의 [서버 주소 직접 입력]에 넣을, 같은 와이파이 안에서 이 PC를 가리키는 주소.
+    // 앱은 포트를 빼고 IP만 입력하면 기본 포트(18080)를 붙이므로, 기본 포트일 때는 IP만 보여줌
     public static String getLanAddressHint() {
+        String ip = getLanIp();
+        String portSuffix = PORT == DEFAULT_PORT ? "" : ":" + PORT;
+        if (ip != null) return ip + portSuffix;
+        return "이 PC의 IP 주소" + portSuffix + " (Wi-Fi 설정에서 IP 확인 필요)";
+    }
+
+    // 같은 와이파이 안에서 이 PC의 IPv4 주소 (못 찾으면 null)
+    public static String getLanIp() {
         try {
             String fallback = null;
             Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
@@ -496,17 +533,16 @@ public class ServerLauncher {
                 while (addrs.hasMoreElements()) {
                     InetAddress addr = addrs.nextElement();
                     if (addr instanceof Inet4Address && addr.isSiteLocalAddress()) {
-                        if (!looksVirtual) return addr.getHostAddress() + ":" + PORT;
-                        if (fallback == null) fallback = addr.getHostAddress() + ":" + PORT;
+                        if (!looksVirtual) return addr.getHostAddress();
+                        if (fallback == null) fallback = addr.getHostAddress();
                     }
                 }
             }
             // 진짜 와이파이/이더넷으로 보이는 게 하나도 없으면(드묾), 그래도 가상 어댑터
             // 주소라도 안내하는 게 아무것도 안 보여주는 것보다 나음
-            if (fallback != null) return fallback;
+            return fallback;
         } catch (Exception ignored) {
-            // 아래 안내 문구로 대체
+            return null;
         }
-        return "이 PC의 IP 주소:" + PORT + " (Wi-Fi 설정에서 IP 확인 필요)";
     }
 }

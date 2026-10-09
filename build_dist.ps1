@@ -1,8 +1,9 @@
 ﻿# 데스크톱 앱 배포본 생성 스크립트 (Java 설치가 없는 PC에서도 실행되는 폴더를 만든다)
 #   결과: dist\AttendanceManager\AttendanceManager.exe  (이 폴더째로 학원 PC에 복사)
-# 사용: powershell -ExecutionPolicy Bypass -File build_dist.ps1 [-ServerJar 경로]
+# 사용: powershell -ExecutionPolicy Bypass -File build_dist.ps1 [-ServerJar 경로] [-ApkPath 경로]
 param(
-    [string]$ServerJar = "C:\Attendance_Server\attendance-server\target\attendance-server-1.0.0.jar"
+    [string]$ServerJar = "C:\Attendance_Server\attendance-server\target\attendance-server-1.0.0.jar",
+    [string]$ApkPath = ""     # 비우면 Android 프로젝트의 apk\debug 폴더에서 가장 최근 APK를 사용 (없으면 APK 없이 빌드)
 )
 $ErrorActionPreference = "Stop"
 $root  = $PSScriptRoot
@@ -74,5 +75,19 @@ if ($LASTEXITCODE -ne 0) { throw "jlink 실패" }
     --main-jar attendance-desktop.jar --main-class main.Main `
     --runtime-image $runtime --dest $dist
 if ($LASTEXITCODE -ne 0) { throw "jpackage 실패" }
+
+# 5) Android 앱: exe 옆에 AttendanceApp.apk로 둠 -> [Android 연결 정보]의 QR 코드로 폰이 내려받음
+#    (build_setup.ps1이 이 폴더를 설치 파일에 담을 때도 같은 위치에 들어감)
+if ([string]::IsNullOrEmpty($ApkPath)) {
+    $apkDir = "C:\Users\shkim\AndroidStudioProjects\AttenadanceApplication\app\build\outputs\apk\debug"
+    $latest = Get-ChildItem $apkDir -Filter *.apk -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($latest) { $ApkPath = $latest.FullName }
+}
+if (-not [string]::IsNullOrEmpty($ApkPath) -and (Test-Path $ApkPath)) {
+    Copy-Item $ApkPath "$dist\AttendanceManager\AttendanceApp.apk"
+    Write-Host "Android APK 포함: $ApkPath"
+} else {
+    Write-Host "참고: Android APK를 찾지 못해 앱 설치용 QR 코드 없이 빌드합니다 (-ApkPath로 지정 가능)"
+}
 
 Write-Host "완료: $dist\AttendanceManager\AttendanceManager.exe"

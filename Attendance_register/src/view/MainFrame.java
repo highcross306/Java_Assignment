@@ -169,16 +169,9 @@ public class MainFrame extends JFrame{
 		return panel;
 	}
 
-	// Android 앱은 같은 Wi-Fi에서 이 PC를 자동으로 찾음. 자동 검색이 막히는 네트워크를 위해
-	// 앱의 [서버 주소 직접 입력]에 넣을 이 PC의 LAN 주소를 함께 보여줌
+	// 앱 설치용 QR 코드 + 이 PC 주소(자동 검색이 막히는 네트워크에서 앱에 직접 입력할 값)
 	private void showAndroidConnectInfo() {
-		String address = ServerLauncher.getLanAddressHint();
-		JOptionPane.showMessageDialog(this,
-				"같은 Wi-Fi에 연결된 Android 앱은 이 PC를 자동으로 찾습니다.\n"
-						+ "(이 프로그램이 켜져 있고, 같은 Wi-Fi여야 합니다)\n\n"
-						+ "자동으로 찾지 못하면 앱의 [서버 주소 직접 입력]에\n"
-						+ "아래 주소를 입력하세요:\n\n" + address,
-				"Android 연결 정보", JOptionPane.INFORMATION_MESSAGE);
+		AndroidConnectDialog.show(this);
 	}
 
 	// 자동 백업(앱 시작/종료 시 하루 단위, 최근 14일)이 쌓이는 폴더를 열거나, 그중 하나로 복원을 예약.
