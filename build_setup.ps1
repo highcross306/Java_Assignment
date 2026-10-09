@@ -73,20 +73,32 @@ if (-not $NoSfx) {
     $winTar = Join-Path $env:SystemRoot "System32\tar.exe"
     & $winTar -a -c -f "$sfx\setup.zip" -C $dist AttendanceSetup
     if ($LASTEXITCODE -ne 0) { throw "zip 생성 실패" }
-    # run.cmd는 ASCII만 사용 (cmd.exe가 UTF-8 한글을 명령으로 해석함)
+    # run.cmd는 ASCII만 사용 (cmd.exe가 UTF-8 한글을 명령으로 해석함). 한글 문구는 AttendanceLoading.exe에 있음.
+    # 콘솔 창은 숨김(IExpress ShowInstallProgramWindow=1). 대신 압축을 푸는 동안 AttendanceLoading.exe가 "준비 중" 창을 보여주고,
+    # 설치 프로그램(Java)이 자기 준비 창을 띄우며 READY 파일을 만들면 닫힘 (setup\src\setup\LoadingWindow.java).
+    # 준비 창 프로그램은 Windows에 기본으로 있는 .NET Framework 컴파일러로 만듦 (setup\loading\Loading.cs)
+    $csc = Join-Path $env:SystemRoot "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    & $csc /nologo /target:winexe /codepage:65001 /optimize+ /out:"$sfx\AttendanceLoading.exe" (Join-Path $root "setup\loading\Loading.cs")
+    if ($LASTEXITCODE -ne 0) { throw "준비 창(AttendanceLoading.exe) 컴파일 실패" }
     $runCmd = @'
 @echo off
 setlocal
 set "DEST=%TEMP%\AttendanceSetup_%RANDOM%%RANDOM%"
+set "ATTENDANCE_SETUP_READY=%DEST%.ready"
 mkdir "%DEST%"
+start "" "%~dp0AttendanceLoading.exe" "%ATTENDANCE_SETUP_READY%"
 "%SystemRoot%\System32\tar.exe" -xf "%~dp0setup.zip" -C "%DEST%"
 if errorlevel 1 (
-  echo Failed to extract the installer files.
-  pause
+  echo ready> "%ATTENDANCE_SETUP_READY%"
+  "%~dp0AttendanceLoading.exe" --extract-failed
+  rmdir /s /q "%DEST%"
   exit /b 1
 )
 "%DEST%\AttendanceSetup\AttendanceSetup.exe"
+echo ready> "%ATTENDANCE_SETUP_READY%"
 rmdir /s /q "%DEST%"
+ping -n 2 127.0.0.1 >nul
+del "%ATTENDANCE_SETUP_READY%" >nul 2>&1
 '@
     [System.IO.File]::WriteAllText("$sfx\run.cmd", $runCmd, [System.Text.Encoding]::ASCII)
     $target = Join-Path $dist "AttendanceSetup.exe"
@@ -99,8 +111,8 @@ Class=IEXPRESS
 SEDVersion=3
 [Options]
 PackagePurpose=InstallApp
-ShowInstallProgramWindow=0
-HideExtractAnimation=1
+ShowInstallProgramWindow=1
+HideExtractAnimation=0
 UseLongFileName=1
 InsideCompressed=0
 CAB_FixedSize=0
@@ -128,11 +140,13 @@ AdminQuietInstCmd=
 UserQuietInstCmd=
 FILE0="run.cmd"
 FILE1="setup.zip"
+FILE2="AttendanceLoading.exe"
 [SourceFiles]
 SourceFiles0=$sfx\
 [SourceFiles0]
 %FILE0%=
 %FILE1%=
+%FILE2%=
 "@
     [System.IO.File]::WriteAllText("$sfx\setup.sed", $sed, [System.Text.Encoding]::ASCII)
     Write-Host "IExpress로 단일 파일을 만드는 중... (수 분 걸릴 수 있습니다)"

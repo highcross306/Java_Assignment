@@ -15,7 +15,16 @@ final class SetupWizard {
     // ================================================================ 설치
 
     static void runInstall(Options o) {
-        SwingUtilities.invokeLater(() -> new InstallFrame(o).setVisible(true));
+        // 마법사 화면을 만드는 동안(처음 실행 시 몇 초) 빈 화면 대신 "준비 중" 창을 먼저 보여줌.
+        // 준비 창을 그릴 기회를 주려고 마법사 생성은 다음 차례로 미룸
+        SwingUtilities.invokeLater(() -> {
+            LoadingWindow loading = LoadingWindow.show();
+            SwingUtilities.invokeLater(() -> {
+                InstallFrame frame = new InstallFrame(o);
+                frame.setVisible(true);
+                loading.close();
+            });
+        });
     }
 
     private static final class InstallFrame extends JFrame {
