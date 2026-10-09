@@ -9,9 +9,9 @@ import java.nio.file.Path;
 // 설치 마법사가 뜨기 전(Java 시작 + 화면 구성, 몇 초)에 보여주는 "준비 중" 창.
 // 데스크톱 앱이 시작할 때 띄우는 "내장 서버 시작 중..." 창과 같은 모양.
 //
-// 단일 파일 설치본(AttendanceSetup.exe)은 Java가 뜨기 전에 압축을 푸는 동안 run.cmd가 띄운
-// PowerShell 창(loading.ps1)이 같은 문구를 보여주고 있음. 이 창이 화면에 뜨면 환경 변수
-// ATTENDANCE_SETUP_READY가 가리키는 파일을 만들어서 그 창을 닫게 함 -> 두 창이 이어서 보임
+// 단일 파일 설치본(AttendanceSetup.exe, setup\bootstrap\Bootstrap.cs)은 Java가 뜨기 전에 압축을 푸는 동안
+// 같은 모양의 준비 창을 보여주고 있음. 이 창이 화면에 뜨면 환경 변수 ATTENDANCE_SETUP_READY가
+// 가리키는 파일을 만들어서 그 창을 닫게 함 -> 두 창이 이어서 보임
 final class LoadingWindow {
 
     static final String MESSAGE = "설치 프로그램 준비 중...";

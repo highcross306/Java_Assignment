@@ -1,4 +1,4 @@
-﻿# 설치 프로그램 만들기: dist\AttendanceSetup\ (폴더) + dist\AttendanceSetup.exe (단일 파일, Windows 내장 IExpress)
+﻿# 설치 프로그램 만들기: dist\AttendanceSetup\ (폴더) + dist\AttendanceSetup.exe (단일 파일, setup\bootstrap\Bootstrap.cs - 실행하면 준비 창부터 뜸)
 #   사용: powershell -ExecutionPolicy Bypass -File build_setup.ps1 [-RebuildApp] [-ApkPath 경로] [-NoSfx]
 #   -RebuildApp : 앱/서버를 먼저 새로 빌드(build_dist.ps1). 없으면 dist\AttendanceManager가 이미 있어야 함
 param(
@@ -65,7 +65,10 @@ Remove-Item $final -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item $setupDir $final -Recurse
 Write-Host ("폴더판 완료: {0}  ({1:N0} MB)" -f $final, ((Get-ChildItem $final -Recurse -File | Measure-Object Length -Sum).Sum / 1MB))
 
-# 6) 단일 파일(AttendanceSetup.exe): zip + 압축 해제 후 실행하는 run.cmd를 IExpress로 묶음
+# 6) 단일 파일(AttendanceSetup.exe): 폴더판을 zip으로 묶어서, 그 zip을 리소스로 넣은 작은 C# 프로그램으로 만듦
+#    (setup\bootstrap\Bootstrap.cs, Windows에 기본으로 있는 .NET Framework 컴파일러 사용 - 따로 설치할 것 없음).
+#    실행하면 "준비 중" 창을 먼저 띄우고 -> 임시 폴더에 풀면서 진행 막대 -> 설치 프로그램(Java) 실행 -> 끝나면 임시 폴더 삭제.
+#    예전 IExpress 방식은 Windows가 전부 풀고 나서야 우리 코드가 돌아서 창이 6초쯤 뒤에야 보였음
 if (-not $NoSfx) {
     $sfx = Join-Path $work "sfx"
     New-Item -ItemType Directory $sfx | Out-Null
@@ -73,84 +76,20 @@ if (-not $NoSfx) {
     $winTar = Join-Path $env:SystemRoot "System32\tar.exe"
     & $winTar -a -c -f "$sfx\setup.zip" -C $dist AttendanceSetup
     if ($LASTEXITCODE -ne 0) { throw "zip 생성 실패" }
-    # run.cmd는 ASCII만 사용 (cmd.exe가 UTF-8 한글을 명령으로 해석함). 한글 문구는 AttendanceLoading.exe에 있음.
-    # 콘솔 창은 숨김(IExpress ShowInstallProgramWindow=1). 대신 압축을 푸는 동안 AttendanceLoading.exe가 "준비 중" 창을 보여주고,
-    # 설치 프로그램(Java)이 자기 준비 창을 띄우며 READY 파일을 만들면 닫힘 (setup\src\setup\LoadingWindow.java).
-    # 준비 창 프로그램은 Windows에 기본으로 있는 .NET Framework 컴파일러로 만듦 (setup\loading\Loading.cs)
-    $csc = Join-Path $env:SystemRoot "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    & $csc /nologo /target:winexe /codepage:65001 /optimize+ /out:"$sfx\AttendanceLoading.exe" (Join-Path $root "setup\loading\Loading.cs")
-    if ($LASTEXITCODE -ne 0) { throw "준비 창(AttendanceLoading.exe) 컴파일 실패" }
-    $runCmd = @'
-@echo off
-setlocal
-set "DEST=%TEMP%\AttendanceSetup_%RANDOM%%RANDOM%"
-set "ATTENDANCE_SETUP_READY=%DEST%.ready"
-mkdir "%DEST%"
-start "" "%~dp0AttendanceLoading.exe" "%ATTENDANCE_SETUP_READY%"
-"%SystemRoot%\System32\tar.exe" -xf "%~dp0setup.zip" -C "%DEST%"
-if errorlevel 1 (
-  echo ready> "%ATTENDANCE_SETUP_READY%"
-  "%~dp0AttendanceLoading.exe" --extract-failed
-  rmdir /s /q "%DEST%"
-  exit /b 1
-)
-"%DEST%\AttendanceSetup\AttendanceSetup.exe"
-echo ready> "%ATTENDANCE_SETUP_READY%"
-rmdir /s /q "%DEST%"
-ping -n 2 127.0.0.1 >nul
-del "%ATTENDANCE_SETUP_READY%" >nul 2>&1
-'@
-    [System.IO.File]::WriteAllText("$sfx\run.cmd", $runCmd, [System.Text.Encoding]::ASCII)
     $target = Join-Path $dist "AttendanceSetup.exe"
     Remove-Item $target -Force -ErrorAction SilentlyContinue
-    # 주의: AppLaunched는 "cmd /c run.cmd"가 아니라 "run.cmd"처럼 파일을 직접 지정해야 실행된다 (cmd /c 형태는 아무것도 실행되지
-    # 않고 조용히 끝남 - 실제로 확인함). 실행 위치는 IExpress가 풀어놓은 임시 폴더(%TEMP%\IXPnnn.TMP)
-    $sed = @"
-[Version]
-Class=IEXPRESS
-SEDVersion=3
-[Options]
-PackagePurpose=InstallApp
-ShowInstallProgramWindow=1
-HideExtractAnimation=0
-UseLongFileName=1
-InsideCompressed=0
-CAB_FixedSize=0
-CAB_ResvCodeSigning=0
-RebootMode=N
-InstallPrompt=%InstallPrompt%
-DisplayLicense=%DisplayLicense%
-FinishMessage=%FinishMessage%
-TargetName=%TargetName%
-FriendlyName=%FriendlyName%
-AppLaunched=%AppLaunched%
-PostInstallCmd=%PostInstallCmd%
-AdminQuietInstCmd=%AdminQuietInstCmd%
-UserQuietInstCmd=%UserQuietInstCmd%
-SourceFiles=SourceFiles
-[Strings]
-InstallPrompt=
-DisplayLicense=
-FinishMessage=
-TargetName=$target
-FriendlyName=Attendance Manager Setup
-AppLaunched=run.cmd
-PostInstallCmd=<None>
-AdminQuietInstCmd=
-UserQuietInstCmd=
-FILE0="run.cmd"
-FILE1="setup.zip"
-FILE2="AttendanceLoading.exe"
-[SourceFiles]
-SourceFiles0=$sfx\
-[SourceFiles0]
-%FILE0%=
-%FILE1%=
-%FILE2%=
-"@
-    [System.IO.File]::WriteAllText("$sfx\setup.sed", $sed, [System.Text.Encoding]::ASCII)
-    Write-Host "IExpress로 단일 파일을 만드는 중... (수 분 걸릴 수 있습니다)"
-    $p = Start-Process iexpress -ArgumentList "/N", "/Q", "$sfx\setup.sed" -Wait -PassThru -WindowStyle Hidden
-    if (-not (Test-Path $target)) { throw "IExpress가 단일 파일을 만들지 못했습니다 (종료 코드 $($p.ExitCode)). -NoSfx로 폴더판만 사용할 수 있습니다." }
+    $fw = Join-Path $env:SystemRoot "Microsoft.NET\Framework64\v4.0.30319"
+    # 아이콘은 설치 프로그램(jpackage) exe와 같은 것을 씀
+    $icon = Join-Path $sfx "setup.ico"
+    Add-Type -AssemblyName System.Drawing
+    $ico = [System.Drawing.Icon]::ExtractAssociatedIcon((Join-Path $final "AttendanceSetup.exe"))
+    $fs = [System.IO.File]::Create($icon); $ico.Save($fs); $fs.Close()
+    Write-Host "단일 파일을 만드는 중..."
+    & (Join-Path $fw "csc.exe") /nologo /target:winexe /codepage:65001 /optimize+ /platform:anycpu `
+        /reference:System.IO.Compression.dll `
+        "/resource:$sfx\setup.zip,setup.zip" `
+        "/win32icon:$icon" `
+        "/out:$target" (Join-Path $root "setup\bootstrap\Bootstrap.cs")
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $target)) { throw "단일 파일(AttendanceSetup.exe)을 만들지 못했습니다. -NoSfx로 폴더판만 사용할 수 있습니다." }
     Write-Host ("단일 파일 완료: {0}  ({1:N0} MB)" -f $target, ((Get-Item $target).Length / 1MB))
 }
