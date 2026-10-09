@@ -83,6 +83,13 @@ final class AndroidConnectDialog {
 		address.setAlignmentX(Component.LEFT_ALIGNMENT);
 		address.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
 		panel.add(address);
+		// 설치할 때 기본 포트를 쓸 수 없어 포트가 바뀐 PC: 앱의 [포트 설정]에 넣어야 자동 검색(와이파이 전체 확인)도 됨
+		if (!ServerLauncher.isDefaultPort()) {
+			panel.add(Box.createRigidArea(new Dimension(0, 10)));
+			panel.add(label("<html>이 PC는 포트 " + ServerLauncher.getPort() + "을(를) 사용합니다.<br>"
+					+ "앱 로그인 화면의 [포트 설정]에<br>" + ServerLauncher.getPort() + "을(를) 입력하세요.</html>",
+					BODY_FONT, new Color(220, 38, 38)));
+		}
 		return panel;
 	}
 

@@ -78,6 +78,10 @@ public class ServerLauncher {
         return PORT;
     }
 
+    public static boolean isDefaultPort() {
+        return PORT == DEFAULT_PORT;
+    }
+
     public static int getDiscoveryPort() {
         return DISCOVERY_PORT;
     }
